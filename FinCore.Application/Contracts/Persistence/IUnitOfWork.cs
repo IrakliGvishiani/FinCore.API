@@ -1,0 +1,15 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Text;
+
+namespace FinCore.Application.Contracts.Persistence
+{
+    public interface IUnitOfWork
+    {
+        Task BeginTransactionAsync(CancellationToken ct = default);
+        Task CommitTransactionAsync(CancellationToken ct = default);
+        Task RollbackTransactionAsync(CancellationToken ct = default);
+
+        Task<int> SaveChangesAsync(CancellationToken ct = default);
+    }
+}
