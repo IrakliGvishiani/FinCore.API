@@ -14,10 +14,12 @@ namespace FinCore.Infrastructure.Configurations
             builder.HasKey(x => x.Id);
 
             builder.Property(x => x.FromCurrency)
+                .HasConversion<string>()
                 .IsRequired()
                 .HasMaxLength(3);
 
             builder.Property(x => x.ToCurrency)
+                .HasConversion<string>()
                 .IsRequired()
                 .HasMaxLength(3);
 

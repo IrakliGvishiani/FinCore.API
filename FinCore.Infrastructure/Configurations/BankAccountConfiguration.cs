@@ -23,8 +23,9 @@ public class BankAccountConfiguration : IEntityTypeConfiguration<BankAccount>
             .HasMaxLength(450);
 
         builder.Property(x => x.Currency)
-            .IsRequired()
-            .HasMaxLength(3);
+            .HasConversion<string>()
+            .HasMaxLength(3)
+            .IsRequired();
 
         builder.Property(x => x.Balance)
             .HasPrecision(18, 2)
@@ -37,6 +38,9 @@ public class BankAccountConfiguration : IEntityTypeConfiguration<BankAccount>
 
         builder.Property(x => x.CreatedAt)
             .IsRequired();
+
+        builder.Property(x => x.RowVersion)
+           .IsRowVersion();
 
         builder.HasOne(x => x.User)
     .WithMany(x => x.BankAccounts)

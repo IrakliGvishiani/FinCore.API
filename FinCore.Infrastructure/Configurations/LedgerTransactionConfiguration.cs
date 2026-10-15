@@ -20,6 +20,11 @@ namespace FinCore.Infrastructure.Configurations
             builder.HasIndex(x => x.Reference)
                 .IsUnique();
 
+            builder.Property(x => x.Currency)
+            .HasConversion<string>()
+            .HasMaxLength(3)
+            .IsRequired();
+
             builder.Property(x => x.CreatedAt)
                 .IsRequired();
 

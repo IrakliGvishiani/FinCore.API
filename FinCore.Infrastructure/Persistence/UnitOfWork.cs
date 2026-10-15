@@ -45,5 +45,10 @@ namespace FinCore.Infrastructure.Persistence
         }
 
         public ValueTask DisposeAsync() => new(ReleaseTransactionAsync());
+
+        public async Task ClearTracking()
+        {
+            _context.ChangeTracker.Clear();
+        }
     }
 }

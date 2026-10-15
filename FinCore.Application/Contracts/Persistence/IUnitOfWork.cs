@@ -11,5 +11,7 @@ namespace FinCore.Application.Contracts.Persistence
         Task RollbackTransactionAsync(CancellationToken ct = default);
 
         Task<int> SaveChangesAsync(CancellationToken ct = default);
+
+        Task ClearTracking();
     }
 }

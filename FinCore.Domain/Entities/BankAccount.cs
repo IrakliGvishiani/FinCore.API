@@ -13,6 +13,7 @@ namespace FinCore.Domain.Entities
         private BankAccount() //For EF Core
         {
         }
+        private const decimal MaxBalance = 9999999999999999.99m;
         public int  Id { get; private set; }
 
         public string AccountNumber { get; private set; }
@@ -30,6 +31,9 @@ namespace FinCore.Domain.Entities
                 throw new DomainException("Account number is required.");
             if (string.IsNullOrWhiteSpace(userId))
                 throw new DomainException("Account owner is required.");
+
+            if (!Enum.IsDefined(typeof(CurrencyCode), currency))
+                throw new DomainException("Invalid currency.");
 
             //if (string.IsNullOrWhiteSpace(currency))
             //    throw new DomainException("Currency is required.");
@@ -64,6 +68,8 @@ namespace FinCore.Domain.Entities
         {
             EnsureValidAmount(amount);
             if (Status != AccountStatus.Active) throw new DomainException("Cannot credit to an inactive account.");
+            if (Balance > MaxBalance - amount)
+                throw new DomainException("Balance limit exceeded.");
             Balance += amount;
         }
 
@@ -84,10 +90,14 @@ namespace FinCore.Domain.Entities
 
         public void Close()
         {
-            if (Status == AccountStatus.Closed)
-                throw new DomainException("Account is already closed.");
+            if (Status != AccountStatus.Active)
+                throw new DomainException(
+                    "Only active accounts can be closed.");
+
             if (Balance != 0)
-                throw new DomainException("Cannot close account with non-zero balance.");
+                throw new DomainException(
+                    "Cannot close account with non-zero balance.");
+
             Status = AccountStatus.Closed;
         }
 
@@ -111,5 +121,7 @@ namespace FinCore.Domain.Entities
         public AccountStatus Status { get; private set; }
 
         public DateTime CreatedAt { get; private set; }
+
+        public byte[] RowVersion { get; private set; } = null!;
     }
 }

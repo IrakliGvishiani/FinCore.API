@@ -26,6 +26,8 @@ namespace FinCore.Middleware
                 BadRequestException => StatusCodes.Status400BadRequest,
                 NotAllowedException => StatusCodes.Status405MethodNotAllowed,
                 UnauthorizedException => StatusCodes.Status401Unauthorized,
+                ConcurrencyConflictException => StatusCodes.Status409Conflict,
+                DuplicateKeyException => StatusCodes.Status409Conflict,
                 _ => StatusCodes.Status500InternalServerError
             };
 

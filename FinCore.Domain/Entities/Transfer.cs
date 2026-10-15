@@ -65,6 +65,35 @@ namespace FinCore.Domain.Entities
             CompletedAt = DateTime.UtcNow;
         }
 
+        public LedgerTransaction Execute(BankAccount from, BankAccount to)
+        {
+            if (Status != TransferStatus.Pending)
+                throw new DomainException("Only pending transfers can be executed.");
+            if (from is null || to is null)
+                throw new DomainException(
+                    "Source and destination accounts are required.");
+
+            if (from.Id != FromAccountId || to.Id != ToAccountId)
+                throw new DomainException(
+                    "Accounts do not match this transfer.");
+
+            from.Debit(Amount);
+            to.Credit(Amount);
+
+            var ledgerTx = LedgerTransaction.Create(
+                reference: $"TRF-{IdempotencyKey}",
+                currency: Currency,
+                lines: new[]
+                {
+                    new LedgerLine(from.Id, EntryType.Debit, Amount),
+                    new LedgerLine(to.Id, EntryType.Credit, Amount)
+                },
+                transferId: Id
+                );
+
+            Complete();
+            return ledgerTx;
+        }
         public static Transfer Create(
             BankAccount fromAccount,
             BankAccount toAccount,
