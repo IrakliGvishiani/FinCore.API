@@ -28,6 +28,7 @@ namespace FinCore.Domain.Entities
 
         public string? Description { get; private set; }
 
+        public string InitiatedByUserId { get; private set; } = null!;
         public string IdempotencyKey { get; private set; } = null!;
 
         public DateTime CreatedAt { get; private set; }
@@ -73,6 +74,10 @@ namespace FinCore.Domain.Entities
                 throw new DomainException(
                     "Source and destination accounts are required.");
 
+            if (from.Currency != Currency || to.Currency != Currency)
+                throw new DomainException(
+                    "Account currencies must match the transfer currency.");
+
             if (from.Id != FromAccountId || to.Id != ToAccountId)
                 throw new DomainException(
                     "Accounts do not match this transfer.");
@@ -95,6 +100,7 @@ namespace FinCore.Domain.Entities
             return ledgerTx;
         }
         public static Transfer Create(
+            string userId,
             BankAccount fromAccount,
             BankAccount toAccount,
             decimal amount,
@@ -107,7 +113,10 @@ namespace FinCore.Domain.Entities
             if (toAccount is null)
                 throw new ArgumentNullException(nameof(toAccount));
 
-            if (fromAccount.Id == toAccount.Id)
+            if (string.IsNullOrWhiteSpace(userId))
+                throw new DomainException("Initiator is required.");
+
+            if (fromAccount.AccountNumber == toAccount.AccountNumber)
                 throw new DomainException(
                     "Source and destination accounts must be different.");
 
@@ -123,12 +132,23 @@ namespace FinCore.Domain.Entities
                 throw new DomainException(
                     "Idempotency key is required.");
 
+            idempotencyKey = idempotencyKey.Trim();
+
+
+
+            if (idempotencyKey.Length > 100)
+                throw new DomainException(
+                    "Idempotency key cannot exceed 100 characters.");
+
+            description = description?.Trim();
+
             if (description?.Length > 500)
                 throw new DomainException(
                     "Description cannot exceed 500 characters.");
 
             return new Transfer
             {
+                InitiatedByUserId = userId,
                 FromAccount = fromAccount,
                 FromAccountId = fromAccount.Id,
                 ToAccount = toAccount,

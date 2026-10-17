@@ -37,6 +37,11 @@ namespace FinCore.Infrastructure.Configurations
                 .WithOne(x => x.LedgerTransaction)
                 .HasForeignKey(x => x.LedgerTransactionId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Navigation(x => x.Entries)
+                .HasField("_entries")
+                .UsePropertyAccessMode(PropertyAccessMode.Field);
+
         }
     }
 }

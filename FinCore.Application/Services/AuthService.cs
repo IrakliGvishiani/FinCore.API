@@ -369,8 +369,9 @@ namespace FinCore.Application.Services
         <body style="font-family: Arial, sans-serif; color: #1f2937;">
             <h2>Reset Your Password</h2>
             <p>We received a request to reset your password.</p>
+            <p>{encodedToken}<p>
             <p>
-                <a href="{encodedToken}"
+                <a href=""
                    style="display:inline-block;padding:12px 24px;
                           background-color:#2563eb;color:#ffffff;
                           text-decoration:none;border-radius:6px;">

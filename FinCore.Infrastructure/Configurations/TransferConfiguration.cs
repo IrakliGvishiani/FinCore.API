@@ -43,9 +43,13 @@ namespace FinCore.Infrastructure.Configurations
             builder.Property(x => x.IdempotencyKey)
                 .IsRequired()
                 .HasMaxLength(100);
+            builder.Property(t => t.InitiatedByUserId)
+            .IsRequired()
+            .HasMaxLength(450);
 
-            builder.HasIndex(x => x.IdempotencyKey)
-                .IsUnique();
+
+            builder.HasIndex(t => new { t.InitiatedByUserId, t.IdempotencyKey })
+            .IsUnique();
 
             builder.Property(x => x.CreatedAt)
                 .IsRequired();

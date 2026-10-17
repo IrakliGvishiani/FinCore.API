@@ -1,6 +1,10 @@
 <Solution>
+  <Project Path="docker-compose.dcproj">
+    <Build />
+  </Project>
   <Project Path="FinCore.Application/FinCore.Application.csproj" />
   <Project Path="FinCore.Domain/FinCore.Domain.csproj" />
   <Project Path="FinCore.Infrastructure/FinCore.Infrastructure.csproj" />
+  <Project Path="FinCore.UnitTests/FinCore.UnitTests.csproj" />
   <Project Path="FinCore/FinCore.csproj" />
 </Solution>

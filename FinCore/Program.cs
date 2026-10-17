@@ -1,10 +1,12 @@
 using FinCore.Application.Contracts.Persistence;
 using FinCore.Application.Contracts.Services;
+using FinCore.Application.Exceptions;
 using FinCore.Application.Mapping;
 using FinCore.Application.Services;
 using FinCore.Domain.Entities;
 using FinCore.Infrastructure;
 using FinCore.Infrastructure.Persistence;
+using FinCore.Infrastructure.Seed;
 using FinCore.Middleware;
 using Mapster;
 using MapsterMapper;
@@ -22,7 +24,7 @@ namespace FinCore
 {
     public class Program
     {
-        public static void Main(string[] args)
+        public static async Task Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
 
@@ -53,6 +55,7 @@ namespace FinCore
             builder.Services.AddScoped<IRedisService, RedisService>();
             builder.Services.AddScoped<ISmtpClientWrapper, SmtpClientWrapper>();
             builder.Services.AddScoped<IEmailService, EmailService>();
+            builder.Services.AddScoped<CommonResponse>();
 
             /// SWAGGER
             builder.Services.AddSwaggerGen(options =>
@@ -149,6 +152,12 @@ namespace FinCore
 
 
             app.MapControllers();
+            using (var scope = app.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                await db.Database.MigrateAsync();
+                await IdentitySeeder.SeedRolesAsync(scope.ServiceProvider);
+            }
 
             app.Run();
         }

@@ -3,6 +3,7 @@ using FinCore.Application.Exceptions;
 using FinCore.Application.Models.AuthModels;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Filters;
+using static FinCore.Examples;
 
 namespace FinCore.Controllers
 {
@@ -20,7 +21,7 @@ namespace FinCore.Controllers
         }
 
         [HttpPost("register-user")]
-
+        [SwaggerRequestExample(typeof(UserRegistrationDto),typeof(UserRegitrationDtoExample))]
         public async Task<IActionResult> RegisterUser([FromBody] UserRegistrationDto request)
         {
             var user = await _authService.RegisterUserAsync(request);

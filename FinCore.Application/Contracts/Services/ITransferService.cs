@@ -14,7 +14,21 @@ namespace FinCore.Application.Contracts.Services
             decimal amount,
             string idempotencyKey,
             string? description = null,
-            CancellationToken cancellationToken = default
+            CancellationToken ct = default
+            );
+
+        Task<(IEnumerable<Transfer> Items, int TotalCount)>
+            GetMyTransfersAsync(
+            string userId,
+            int pageNumber,
+            int pageSize,
+            CancellationToken ct = default
+            );
+
+        Task<Transfer> GetTransfersByIdAsync(
+            string userId,
+            int transferId,
+            CancellationToken ct = default
             );
     }
 }

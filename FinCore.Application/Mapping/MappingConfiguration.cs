@@ -1,4 +1,5 @@
 ﻿using FinCore.Application.Models.AuthModels;
+using FinCore.Application.Models.BankAccountDtos;
 using FinCore.Domain.Entities;
 using Mapster;
 using System;
@@ -18,6 +19,11 @@ namespace FinCore.Application.Mapping
                 .Map(dest => dest.Email, src => src.Email)
                 .Map(dest => dest.PhoneNumber, src => src.PhoneNumber)
                 .Map(dest => dest.PersonalNumber, src => src.PersonalNumber);
+
+
+            config.NewConfig<BankAccount, OpenAccountResponseDto>();
+
+            config.NewConfig<BankAccount, AccountForGettingDto>();
         }
     }
 }

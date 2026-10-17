@@ -33,6 +33,10 @@ namespace FinCore.Domain.Entities
             int? transferId = null
             )
         {
+            if (transferId.HasValue && transferId.Value <= 0)
+                throw new DomainException(
+                    "Transfer ID must be positive.");
+
             if (!Enum.IsDefined(typeof(CurrencyCode), currency))
                 throw new DomainException("Invalid currency.");
 
@@ -65,6 +69,13 @@ namespace FinCore.Domain.Entities
 
             if (debits != credits)
                 throw new DomainException("Debits and credits must balance.");
+
+            if (!list.Any(l => l.Type == EntryType.Debit) ||
+               !list.Any(l => l.Type == EntryType.Credit))
+            {
+                throw new DomainException(
+                    "A ledger transaction must contain both debit and credit entries.");
+            }
 
             var now = DateTime.UtcNow;
 

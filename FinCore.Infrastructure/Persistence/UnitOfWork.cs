@@ -1,4 +1,6 @@
 ﻿using FinCore.Application.Contracts.Persistence;
+using FinCore.Application.Exceptions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
 namespace FinCore.Infrastructure.Persistence
@@ -10,8 +12,14 @@ namespace FinCore.Infrastructure.Persistence
 
         public UnitOfWork(ApplicationDbContext context) => _context = context;
 
-        public Task<int> SaveChangesAsync(CancellationToken ct = default)
-            => _context.SaveChangesAsync(ct);
+        public async Task<int> SaveChangesAsync(CancellationToken ct = default)
+        {
+            try { return await _context.SaveChangesAsync(ct); }
+            catch (DbUpdateConcurrencyException)
+            { throw new ConcurrencyConflictException(); }
+            catch (DbUpdateException ex) when (ex.InnerException is Microsoft.Data.SqlClient.SqlException { Number: 2601 or 2627 })
+            { throw new DuplicateKeyException(); }
+        }
 
         public async Task BeginTransactionAsync(CancellationToken ct = default)
         {
