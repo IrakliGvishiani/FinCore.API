@@ -18,6 +18,7 @@ using Microsoft.OpenApi;
 using StackExchange.Redis;
 using Swashbuckle.AspNetCore.Filters;
 using System.Text;
+using System.Text.Json.Serialization;
 
 
 namespace FinCore
@@ -30,7 +31,13 @@ namespace FinCore
 
             // Add services to the container.
 
-            builder.Services.AddControllers();
+            builder.Services
+                .AddControllers()
+            .AddJsonOptions(options =>
+            {
+                options.JsonSerializerOptions.Converters.Add(
+                    new JsonStringEnumConverter());
+            });
 
             //SQL
             builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -55,6 +62,7 @@ namespace FinCore
             builder.Services.AddScoped<IRedisService, RedisService>();
             builder.Services.AddScoped<ISmtpClientWrapper, SmtpClientWrapper>();
             builder.Services.AddScoped<IEmailService, EmailService>();
+            builder.Services.AddScoped<IAccountService, AccountService>();
             builder.Services.AddScoped<CommonResponse>();
 
             /// SWAGGER

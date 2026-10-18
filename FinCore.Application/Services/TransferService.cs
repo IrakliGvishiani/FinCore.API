@@ -1,6 +1,7 @@
 ﻿using FinCore.Application.Contracts.Persistence;
 using FinCore.Application.Contracts.Services;
 using FinCore.Application.Exceptions;
+using FinCore.Application.Models.TransferDtos;
 using FinCore.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using System;
@@ -28,9 +29,40 @@ namespace FinCore.Application.Services
             _unitOfWork = unitOfWork;
         }
 
+        private static TransferDto ToDto(Transfer t, string fromNumber, string toNumber) => new()
+        {
+            Id = t.Id,
+            FromAccountNumber = fromNumber,
+            ToAccountNumber = toNumber,
+            Amount = t.Amount,
+            Currency = t.Currency,
+            Status = t.Status,
+            Description = t.Description,
+            CreatedAt = t.CreatedAt,
+            CompletedAt = t.CompletedAt,
+            FailureReason = t.FailureReason
+        };
+
+        private static MyTransferDto ToMyDto(Transfer t, HashSet<int> myAccountIds)
+        {
+            var outgoing = myAccountIds.Contains(t.FromAccountId);
+
+            return new MyTransferDto
+            {
+                Id = t.Id,
+                Direction = outgoing ? TransferDirection.Outgoing : TransferDirection.Incoming,
+                MyAccountNumber = outgoing ? t.FromAccount.AccountNumber : t.ToAccount.AccountNumber,
+                CounterPartyAccountNumber = outgoing ? t.ToAccount.AccountNumber : t.FromAccount.AccountNumber,
+                Amount = t.Amount,
+                Currency = t.Currency,
+                Status = t.Status,
+                Description = t.Description,
+                CreatedAt = t.CreatedAt
+            };
+        }
 
 
-        public async Task<Transfer> ExecuteTransferAsync(
+        public async Task<TransferDto> ExecuteTransferAsync(
             string userId,
             string fromAccountNumber,
             string toAccountNumber,
@@ -77,7 +109,7 @@ namespace FinCore.Application.Services
 
 
 
-        public async Task<(IEnumerable<Transfer> Items,int TotalCount)> GetMyTransfersAsync(
+        public async Task<(IEnumerable<MyTransferDto> Items,int TotalCount)> GetMyTransfersAsync(
             string userId,
             int pageNumber = 1,
             int pageSize = 10,
@@ -106,7 +138,9 @@ namespace FinCore.Application.Services
                 .ToList();
 
             if (accountIds.Count == 0)
-                return (Enumerable.Empty<Transfer>(), 0);
+                return (Enumerable.Empty<MyTransferDto>(), 0);
+
+            var myIds = accountIds.ToHashSet();
 
             var result = await _transferRepository.GetAllAsync(
                 filter: x =>
@@ -123,10 +157,10 @@ namespace FinCore.Application.Services
                 .Include(x => x.ToAccount)
                 );
 
-            return result;
+            return (result.Items.Select(t => ToMyDto(t,myIds)).ToList(),result.TotalCount);
         }
 
-        public async Task<Transfer> GetTransfersByIdAsync(
+        public async Task<TransferDto> GetTransfersByIdAsync(
             string userId,
             int transferId,
             CancellationToken ct = default
@@ -152,11 +186,13 @@ namespace FinCore.Application.Services
 
             if (transfer is null) throw new NotFoundException("Transfer not found!");
 
-            return transfer;
+            return ToDto(transfer,
+                transfer.FromAccount.AccountNumber,
+                transfer.ToAccount.AccountNumber);
         }
 
 
-        private async Task<Transfer> TryExecuteAsync(
+        private async Task<TransferDto> TryExecuteAsync(
     string userId,
     string fromAccountNumber,
     string toAccountNumber,
@@ -186,14 +222,13 @@ namespace FinCore.Application.Services
                 if (to is null)
                     throw new NotFoundException("Destination account not found.");
 
-                if (from.Id == to.Id)
-                    throw new BadRequestException(
-                        "Source and destination accounts cannot be the same.");
+                //if (from.Id == to.Id)
+                //    throw new BadRequestException(
+                //        "Source and destination accounts cannot be the same."); //Domain mainc amowmebs
 
                 var existing = await _transferRepository.GetAsync(
-                    x => x.IdempotencyKey == idempotencyKey,
-                    tracking: false,
-                    cancellationToken: cancellationToken);
+                    x => x.InitiatedByUserId == userId && x.IdempotencyKey == idempotencyKey,
+                    tracking: false, cancellationToken: cancellationToken);
 
                 if (existing is not null)
                 {
@@ -205,18 +240,12 @@ namespace FinCore.Application.Services
                         await _unitOfWork.RollbackTransactionAsync(
                             CancellationToken.None);
 
-                        return existing;
+                        return ToDto(existing,from.AccountNumber,to.AccountNumber);
                     }
 
-                    throw new BadRequestException(
+                    throw new ConcurrencyConflictException(
                         "Idempotency key already used for a different transfer.");
                 }
-
-                var fromAccount = await _accountRepository.GetAsync(
-                    x => x.AccountNumber == fromAccountNumber,
-                    tracking: false,
-                    cancellationToken: cancellationToken
-                    );
 
                 var transfer = Transfer.Create(
                     userId,
@@ -242,7 +271,7 @@ namespace FinCore.Application.Services
 
                 await _unitOfWork.CommitTransactionAsync(cancellationToken);
 
-                return transfer;
+                return ToDto(transfer,from.AccountNumber,to.AccountNumber);
             }
             catch
             {

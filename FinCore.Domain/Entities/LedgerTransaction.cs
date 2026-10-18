@@ -93,5 +93,28 @@ namespace FinCore.Domain.Entities
 
             return tx;
         }
+
+        public static LedgerTransaction CreateDeposit(string reference,CurrencyCode currency,
+            int bankAccountId,decimal amount)
+        {
+            if (string.IsNullOrWhiteSpace(reference))
+                throw new DomainException("Reference is required.");
+            if (amount <= 0 || decimal.Round(amount, 2) != amount)
+                throw new DomainException("Amount must be positive with at most 2 decimals.");
+
+            var now = DateTime.UtcNow;
+
+            var tx = new LedgerTransaction
+            {
+                Reference = reference.Trim(),
+                Currency = currency,
+                TransferId = null,
+                CreatedAt = now
+            };
+
+            tx._entries.Add(new LedgerEntry(bankAccountId,EntryType.Credit,amount,currency,now));
+
+            return tx;
+        }
     }
 }

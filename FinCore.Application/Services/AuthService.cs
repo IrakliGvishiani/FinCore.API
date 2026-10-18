@@ -6,6 +6,7 @@ using FinCore.Domain.Entities;
 using MapsterMapper;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Org.BouncyCastle.Security;
 using System;
@@ -230,6 +231,15 @@ namespace FinCore.Application.Services
 
                 if (!PhoneRegex.IsMatch(model.PhoneNumber))
                     throw new BadRequestException("Phone number must be +995XXXXXXXXX format");
+
+                if (await _userManager.Users.AnyAsync(u => u.PersonalNumber == model.PersonalNumber))
+                    throw new BadRequestException("Choose different personal number");
+
+                if (await _userManager.Users.AnyAsync(u => u.PhoneNumber == model.PhoneNumber))
+                    throw new BadRequestException("Choose different phone number");
+
+                if (await _userManager.Users.AnyAsync(u => u.Email == model.Email))
+                    throw new BadRequestException("Choose different email");
 
                 var user = _mapper.Map<ApplicationUser>(model);
 

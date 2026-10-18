@@ -17,7 +17,7 @@ namespace FinCore.Infrastructure.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.12")
+                .HasAnnotation("ProductVersion", "10.0.13")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -366,6 +366,11 @@ namespace FinCore.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<string>("InitiatedByUserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -378,10 +383,10 @@ namespace FinCore.Infrastructure.Migrations
 
                     b.HasIndex("FromAccountId");
 
-                    b.HasIndex("IdempotencyKey")
-                        .IsUnique();
-
                     b.HasIndex("ToAccountId");
+
+                    b.HasIndex("InitiatedByUserId", "IdempotencyKey")
+                        .IsUnique();
 
                     b.ToTable("Transfers", null, t =>
                         {
