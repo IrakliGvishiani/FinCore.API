@@ -1,11 +1,15 @@
 ﻿using FinCore.Application.Contracts.Persistence;
 using FinCore.Application.Contracts.Services;
 using FinCore.Application.Exceptions;
+using FinCore.Application.Models.Audit;
+using FinCore.Application.Models.BankAccountDtos;
 using FinCore.Application.Models.TransferDtos;
 using FinCore.Domain.Entities;
+using FinCore.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Text;
 
 namespace FinCore.Application.Services
@@ -16,17 +20,26 @@ namespace FinCore.Application.Services
         private readonly IRepositoryBase<BankAccount> _accountRepository;
         private readonly IRepositoryBase<Transfer> _transferRepository;
         private readonly IRepositoryBase<LedgerTransaction> _ledgerRepository;
+        private readonly IRepositoryBase<ApplicationUser> _userRepository;
+        private readonly IRedisService _redisService;
         private readonly IUnitOfWork _unitOfWork;
+        private readonly IAuditService _audit;
 
         public TransferService(IRepositoryBase<BankAccount> accountRepository,
             IRepositoryBase<Transfer> transferRepository,
             IRepositoryBase<LedgerTransaction> ledgerRepository,
-            IUnitOfWork unitOfWork)
+            IUnitOfWork unitOfWork,
+            IRepositoryBase<ApplicationUser> userRepository,
+            IRedisService redisService,
+            IAuditService auditService)
         {
             _accountRepository = accountRepository;
             _transferRepository = transferRepository;
             _ledgerRepository = ledgerRepository;
             _unitOfWork = unitOfWork;
+            _userRepository = userRepository;
+            _redisService = redisService;
+            _audit = auditService;
         }
 
         private static TransferDto ToDto(Transfer t, string fromNumber, string toNumber) => new()
@@ -60,49 +73,49 @@ namespace FinCore.Application.Services
                 CreatedAt = t.CreatedAt
             };
         }
-
-
-        public async Task<TransferDto> ExecuteTransferAsync(
-            string userId,
-            string fromAccountNumber,
-            string toAccountNumber,
-            decimal amount,
-            string idempotencyKey,
-            string? description = null,
-            CancellationToken ct = default
-            )
+        private async Task<TransferDto> ExecuteWithRetryAsync(
+    string userId, string fromAccountNumber, int toAccountId,
+    decimal amount, string idempotencyKey, string? description, CancellationToken ct)
         {
             if (string.IsNullOrWhiteSpace(idempotencyKey) || idempotencyKey.Length > 100)
-                throw new BadRequestException("idempotencyKey is required (max 100 chars)");
+                throw new BadRequestException("Idempotency key is required (max 100 chars).");
 
             description = NormalizeDescription(description);
 
             const int maxAttempts = 3;
-
-                for (var attempt = 1; ; attempt++)
+            for (var attempt = 1; ; attempt++)
             {
                 try
                 {
                     return await TryExecuteAsync(
-                        userId,
-                        fromAccountNumber,
-                        toAccountNumber,
-                        amount,
-                        idempotencyKey,
-                        description,
-                        ct
-                        );
+                        userId, fromAccountNumber, toAccountId, amount, idempotencyKey, description, ct);
                 }
-                catch(Exception ex) when (
-                (ex is ConcurrencyConflictException or DuplicateKeyException)
-                && attempt < maxAttempts
-                )
+                catch (Exception ex) when (
+                    (ex is ConcurrencyConflictException or DuplicateKeyException) && attempt < maxAttempts)
                 {
                     await _unitOfWork.ClearTracking();
-                    await Task.Delay(Random.Shared.Next(20,80) * attempt, ct);
+                    await Task.Delay(Random.Shared.Next(20, 80) * attempt, ct);
                 }
             }
+        }
+        public Task<TransferDto> ExecuteTransferByRecipientAccountIdAsync(
+        string userId, string fromAccountNumber, int toAccountId,
+        decimal amount, string idempotencyKey, string? description = null,
+        CancellationToken ct = default)
+          => ExecuteWithRetryAsync(
+        userId, fromAccountNumber, toAccountId, amount, idempotencyKey, description, ct);
 
+        public async Task<TransferDto> ExecuteTransferByAccountNumberAsync(
+            string userId, string fromAccountNumber, string toAccountNumber,
+            decimal amount, string idempotencyKey, string? description = null,
+            CancellationToken ct = default)
+        {
+            var to = await _accountRepository.GetAsync(
+                x => x.AccountNumber == toAccountNumber, tracking: false, cancellationToken: ct)
+                ?? throw new NotFoundException("Destination account not found.");
+
+            return await ExecuteWithRetryAsync(
+                userId, fromAccountNumber, to.Id, amount, idempotencyKey, description, ct);
         }
         private static string? NormalizeDescription(string? d)
          => string.IsNullOrWhiteSpace(d) ? null : d.Trim();
@@ -195,7 +208,7 @@ namespace FinCore.Application.Services
         private async Task<TransferDto> TryExecuteAsync(
     string userId,
     string fromAccountNumber,
-    string toAccountNumber,
+    int toAccountId,
     decimal amount,
     string idempotencyKey,
     string? description = null,
@@ -216,11 +229,15 @@ namespace FinCore.Application.Services
                     throw new NotFoundException("Source account not found.");
 
                 var to = await _accountRepository.GetAsync(
-                    x => x.AccountNumber == toAccountNumber,
+                    x => x.Id == toAccountId,
                     cancellationToken: cancellationToken);
 
                 if (to is null)
                     throw new NotFoundException("Destination account not found.");
+
+                if (from.Currency != to.Currency)
+                    throw new BadRequestException(
+                        "Source and destination accounts must use the same currency.");
 
                 //if (from.Id == to.Id)
                 //    throw new BadRequestException(
@@ -243,7 +260,7 @@ namespace FinCore.Application.Services
                         return ToDto(existing,from.AccountNumber,to.AccountNumber);
                     }
 
-                    throw new ConcurrencyConflictException(
+                    throw new ConflictException(
                         "Idempotency key already used for a different transfer.");
                 }
 
@@ -269,6 +286,11 @@ namespace FinCore.Application.Services
 
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
 
+                await _audit.RecordAsync(userId, AuditActions.TransferCompleted, AuditEntities.Transfer,
+                transfer.Id.ToString(),
+                $"amount={amount} {from.Currency}; from={from.AccountNumber}; to={to.AccountNumber}", cancellationToken);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
+
                 await _unitOfWork.CommitTransactionAsync(cancellationToken);
 
                 return ToDto(transfer,from.AccountNumber,to.AccountNumber);
@@ -281,6 +303,65 @@ namespace FinCore.Application.Services
                 throw;
             }
         }
+
+        public async Task<IReadOnlyList<RecipientAccountDto>> GetRecipientAccountAsync(string userId,
+            string personalNumber,
+            CancellationToken ct = default)
+        {
+            if (string.IsNullOrWhiteSpace(personalNumber))
+                throw new BadRequestException("Personal number is required.");
+
+            var allowed = await _redisService.TryAcquireRateLimitAsync(
+                keyPrefix: "recipient-lookup",
+                userId: userId,
+                maxRequests: 20,
+                cooldown: TimeSpan.FromSeconds(1),
+                window: TimeSpan.FromMinutes(10));
+
+            if (!allowed)
+                throw new BadRequestException("Too many lookups. Please try again later");
+
+            personalNumber = personalNumber.Trim();
+
+            var recipient = await _userRepository.GetAsync(
+                x => x.PersonalNumber == personalNumber,
+                tracking: false,
+                cancellationToken: ct
+                ) ?? throw new NotFoundException("Recipient not found");
+
+            
+
+            var (accounts, _) = await _accountRepository.GetAllAsync(
+            filter: a => a.UserId == recipient.Id && a.Status == AccountStatus.Active,
+            orderBy: a => a.Currency,
+            tracking: false,
+            cancellationToken: ct);
+            if (!accounts.Any())
+                throw new NotFoundException("Recipient not found.");
+
+            return accounts.Select(a => new RecipientAccountDto
+            {
+                AccountId = a.Id,
+                MaskedAccountNumber = MaskAccountNumber(a.AccountNumber),
+                Currency = a.Currency
+            }).ToList();
+
+        }
+
+        private static string MaskAccountNumber(string accountNumber)
+        {
+            if (string.IsNullOrWhiteSpace(accountNumber))
+                return string.Empty;
+
+            const int visibleDigits = 4;
+
+            if (accountNumber.Length <= visibleDigits)
+                return new string('*', accountNumber.Length);
+
+            return new string('*', accountNumber.Length - visibleDigits)
+                + accountNumber[^visibleDigits..];
+        }
+
 
     }
 }

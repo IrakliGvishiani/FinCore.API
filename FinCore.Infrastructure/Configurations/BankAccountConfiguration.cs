@@ -39,6 +39,8 @@ public class BankAccountConfiguration : IEntityTypeConfiguration<BankAccount>
         builder.Property(x => x.CreatedAt)
             .IsRequired();
 
+        builder.Property(a => a.Name).IsRequired().HasMaxLength(50);
+
         builder.Property(x => x.RowVersion)
            .IsRowVersion();
 

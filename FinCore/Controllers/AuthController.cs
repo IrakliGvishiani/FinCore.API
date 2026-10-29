@@ -1,6 +1,7 @@
 ﻿using FinCore.Application.Contracts.Services;
 using FinCore.Application.Exceptions;
 using FinCore.Application.Models.AuthModels;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Filters;
 using static FinCore.Examples;
@@ -20,7 +21,7 @@ namespace FinCore.Controllers
             _commonResponse = commonResponse;
         }
 
-        [HttpPost("register-user")]
+        [HttpPost("register")]
         [SwaggerRequestExample(typeof(UserRegistrationDto),typeof(UserRegitrationDtoExample))]
         public async Task<IActionResult> RegisterUser([FromBody] UserRegistrationDto request)
         {
@@ -33,6 +34,13 @@ namespace FinCore.Controllers
         {
             var admin = await _authService.RegisterAdminAsync(request);
             return this.ToActionResult(_commonResponse.Created(admin));
+        }
+        [Authorize(Roles = "Admin")]
+        [HttpPost("register-manager")]
+        public async Task<IActionResult> RegisterManager([FromBody] UserRegistrationDto request)
+        {
+            var manager = await _authService.RegisterManagerAsync(request);
+            return this.ToActionResult(_commonResponse.Created(manager));
         }
 
         [HttpPost("confirm-email")]

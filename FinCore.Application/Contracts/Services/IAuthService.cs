@@ -11,6 +11,8 @@ namespace FinCore.Application.Contracts.Services
 
         Task<string> RegisterAdminAsync(UserRegistrationDto model);
 
+        Task<string> RegisterManagerAsync(UserRegistrationDto model);
+
         Task<LoginResponseDto> LoginAsync(LoginRequestDto model);
 
         Task ConfirmEmailAsync(ConfirmEmailDto model);

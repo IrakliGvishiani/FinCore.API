@@ -13,10 +13,14 @@ namespace FinCore.Domain.Entities
         private BankAccount() //For EF Core
         {
         }
+        public const int MaxNameLength = 50;
+
         private const decimal MaxBalance = 9999999999999999.99m;
         public int  Id { get; private set; }
 
         public string AccountNumber { get; private set; }
+
+        public string Name { get; private set; } = null!;
 
         public string UserId { get; private set; }
 
@@ -25,7 +29,7 @@ namespace FinCore.Domain.Entities
 
         public decimal Balance { get; private set; }
 
-        public static BankAccount Create(string accountNumber, string userId, CurrencyCode currency)
+        public static BankAccount Create(string accountNumber, string userId, CurrencyCode currency,string? name =null)
         {
             if (string.IsNullOrWhiteSpace(accountNumber))
                 throw new DomainException("Account number is required.");
@@ -46,12 +50,33 @@ namespace FinCore.Domain.Entities
             return new BankAccount
             {
                 AccountNumber = accountNumber,
+                Name = NormalizeName(name) ?? $"{currency} account",
                 UserId = userId,
                 Currency = currency,
                 Balance = 0m,
                 Status = AccountStatus.Active,
                 CreatedAt = DateTime.UtcNow
             };
+        }
+
+        public void Rename(string name)
+        {
+            if (Status == AccountStatus.Closed)
+                throw new DomainException("Closed accounts cannot be renamed.");
+
+            Name = NormalizeName(name)
+                ?? throw new DomainException("Account name is required.");
+        }
+
+        private static string? NormalizeName(string? name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return null;
+
+            name = name.Trim();
+            if (name.Length > MaxNameLength)
+                throw new DomainException($"Account name cannot exceed {MaxNameLength} characters.");
+
+            return name;
         }
 
 

@@ -1,13 +1,17 @@
+using CloudinaryDotNet;
 using FinCore.Application.Contracts.Persistence;
 using FinCore.Application.Contracts.Services;
 using FinCore.Application.Exceptions;
 using FinCore.Application.Mapping;
+using FinCore.Application.Models.Cloudinary;
+using FinCore.Application.Models.ExchangeDtos;
 using FinCore.Application.Services;
 using FinCore.Domain.Entities;
 using FinCore.Infrastructure;
 using FinCore.Infrastructure.Persistence;
 using FinCore.Infrastructure.Seed;
 using FinCore.Middleware;
+using FinCore.Others;
 using Mapster;
 using MapsterMapper;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -41,7 +45,11 @@ namespace FinCore
 
             //SQL
             builder.Services.AddDbContext<ApplicationDbContext>(options =>
-                options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+                options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"))
+                .EnableDetailedErrors()
+                .LogTo(Console.WriteLine, LogLevel.Information) 
+                );
+            
 
             // MAPSTER 
             var config = TypeAdapterConfig.GlobalSettings;
@@ -64,6 +72,25 @@ namespace FinCore
             builder.Services.AddScoped<IEmailService, EmailService>();
             builder.Services.AddScoped<IAccountService, AccountService>();
             builder.Services.AddScoped<CommonResponse>();
+            builder.Services.AddScoped<IProfileService, ProfileService>();
+            builder.Services.AddScoped<ICloudinaryImageService, CloudinaryImageService>();
+            builder.Services.AddScoped<IConversionService, ConversionService>();
+            builder.Services.AddScoped<IAccountStatementService,AccountStatementService>();
+            builder.Services.AddScoped<IAuditService, AuditService>();
+            builder.Services.AddScoped<IUserManagementService, UserManagementService>();
+
+            builder.Services.AddMemoryCache();
+            builder.Services.AddHttpClient<IExchangeRateProvider, NbgExchangeRateProvider>(c =>
+            {
+                c.BaseAddress = new Uri("https://nbg.gov.ge/");
+                c.Timeout = TimeSpan.FromSeconds(5);
+            });
+
+            builder.Services.Configure<ConversionOptions>(
+            builder.Configuration.GetSection(ConversionOptions.SectionName));
+
+            builder.Services.AddHttpContextAccessor();
+            builder.Services.AddScoped<IRequestContext, HttpRequestContext>();
 
             /// SWAGGER
             builder.Services.AddSwaggerGen(options =>
@@ -147,6 +174,18 @@ namespace FinCore
                 };
             });
 
+            // CLOUDINARY
+            builder.Services.Configure<CloudinarySettings>(builder.Configuration.GetSection("Cloudinary"));
+            var cloudinarySettings = builder.Configuration.GetSection("Cloudinary").Get<CloudinarySettings>();
+            var account = new Account(cloudinarySettings.CloudName, cloudinarySettings.ApiKey, cloudinarySettings.ApiSecret);
+
+            var cloudinary = new Cloudinary(account)
+            {
+                Api = { Secure = true }
+            };
+
+            builder.Services.AddSingleton(cloudinary);
+
 
             var app = builder.Build();
 
@@ -160,11 +199,25 @@ namespace FinCore
 
 
             app.MapControllers();
-            using (var scope = app.Services.CreateScope())
+        
+            try
             {
-                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-                await db.Database.MigrateAsync();
-                await IdentitySeeder.SeedRolesAsync(scope.ServiceProvider);
+                using (var scope = app.Services.CreateScope())
+                {
+                    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                    await db.Database.MigrateAsync();
+                    await IdentitySeeder.SeedRolesAsync(scope.ServiceProvider);
+                    await IdentitySeeder.SeedLedgerAccountsAsync(db);
+                }
+            }
+            catch(Microsoft.Data.SqlClient.SqlException ex)
+            {
+                Console.WriteLine($"SQL Error Number: {ex.Number}");
+                Console.WriteLine($"SQL Error Message: {ex.Message}");
+                Console.WriteLine($"SQL Procedure: {ex.Procedure}");
+                Console.WriteLine($"SQL Line Number: {ex.LineNumber}");
+
+                throw;
             }
 
             app.Run();

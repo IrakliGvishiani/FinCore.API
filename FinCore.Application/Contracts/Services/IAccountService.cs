@@ -8,7 +8,9 @@ namespace FinCore.Application.Contracts.Services
 {
     public interface IAccountService
     {
-        Task<OpenAccountResponseDto> OpenAccountAsync(string userId,CurrencyCode currency,CancellationToken ct = default);
+        Task<OpenAccountResponseDto> OpenAccountAsync(string userId,CurrencyCode currency,
+            string name,
+            CancellationToken ct = default);
 
         Task<IReadOnlyList<AccountForGettingDto>> GetMyAccountsAsync(
             string userId,
@@ -26,5 +28,11 @@ namespace FinCore.Application.Contracts.Services
         Task<AccountForGettingDto> DepositAsync(string userId,
             string accountNumber,decimal amount,
             string idempotencyKey,CancellationToken ct = default);
+
+        Task<AccountForGettingDto> RenameAccountAsync(
+            string userId,
+            string accountNumber,
+            string name,
+            CancellationToken ct = default);
     }
 }

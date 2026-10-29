@@ -37,5 +37,9 @@ namespace FinCore.Infrastructure
 
         public DbSet<CurrencyExchangeRate> CurrencyExchangeRates { get; set; }
 
+        public DbSet<CurrencyConversion> CurrencyConversions { get; set; }
+
+        public DbSet<LedgerAccount> LedgerAccounts { get; set; }
+
     }
 }

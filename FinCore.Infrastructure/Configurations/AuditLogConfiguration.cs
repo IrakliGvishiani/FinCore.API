@@ -40,6 +40,9 @@ namespace FinCore.Infrastructure.Configurations
             builder.HasIndex(x => x.CreatedAt);
 
             builder.HasIndex(x => x.UserId);
+
+            builder.HasIndex(a => a.Action);
+            builder.HasIndex(a => new { a.EntityName, a.EntityId });
         }
     }
 }

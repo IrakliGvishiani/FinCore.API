@@ -9,6 +9,8 @@ namespace FinCore.Application.Models.BankAccountDtos
     {
         public string AccountNumber { get; set; } = null!;
 
+        public string Name { get; set; } = null!;
+
         public decimal Balance { get; set; }
 
         public CurrencyCode Currency { get; set; }

@@ -29,8 +29,9 @@ namespace FinCore.Infrastructure.Configurations
             });
 
             builder.Property(x => x.Currency)
-                .IsRequired()
-                .HasMaxLength(3);
+            .HasConversion<string>()
+            .HasMaxLength(3)
+            .IsRequired();
 
             builder.Property(x => x.Status)
                 .HasConversion<string>()

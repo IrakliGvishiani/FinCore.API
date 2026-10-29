@@ -28,6 +28,8 @@ namespace FinCore.Middleware
                 UnauthorizedException => StatusCodes.Status401Unauthorized,
                 ConcurrencyConflictException => StatusCodes.Status409Conflict,
                 DuplicateKeyException => StatusCodes.Status409Conflict,
+                ConflictException => StatusCodes.Status409Conflict,
+                ExternalServiceException => StatusCodes.Status503ServiceUnavailable,
                 _ => StatusCodes.Status500InternalServerError
             };
 

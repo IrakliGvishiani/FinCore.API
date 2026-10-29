@@ -1,5 +1,7 @@
-﻿using FinCore.Application.Contracts.Services;
+﻿using CloudinaryDotNet.Actions;
+using FinCore.Application.Contracts.Services;
 using FinCore.Application.Exceptions;
+using FinCore.Application.Models.BankAccountDtos;
 using FinCore.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -19,15 +21,18 @@ namespace FinCore.Controllers
     {
         private readonly CommonResponse _commonResponse;
         private readonly IAccountService _accountService;
+        private readonly IAccountStatementService _accountStatementService;
 
 
         public BankAccountController(
             CommonResponse commonResponse,
-            IAccountService accountService
+            IAccountService accountService,
+            IAccountStatementService accountStatementService
             )
         {
             _commonResponse = commonResponse;
             _accountService = accountService;
+            _accountStatementService = accountStatementService;
         }
 
         private string GetUserId()
@@ -38,7 +43,7 @@ namespace FinCore.Controllers
 
         //GET ACCOUNTS
         [HttpGet]
-        [Authorize(Roles = "User")]
+        [Authorize(Roles = "Customer")]
 
         public async Task<IActionResult> GetMyAccounts(CancellationToken ct)
         {
@@ -49,9 +54,34 @@ namespace FinCore.Controllers
             return this.ToActionResult(_commonResponse.Success(accounts));
         }
 
+        [HttpGet("{accountNumber}/statement")]
+        [Authorize(Roles = "Customer")]
+        public async Task<IActionResult> GetAccountStatement(
+            string accountNumber,
+            [FromQuery] DateTime? from,
+            [FromQuery] DateTime? to,
+            [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 15,
+            CancellationToken ct = default
+            )
+        {
+            var statement = await _accountStatementService.GetStatementAsync(
+                GetUserId(),
+                accountNumber,
+                from,
+                to,
+                pageNumber,
+                pageSize,
+                ct
+                );
+
+            return this.ToActionResult(_commonResponse.Success(statement));
+        }
+
+
         //GET ACCOUNT BY ACCNUMBER
         [HttpGet("{accountNumber}")]
-        [Authorize(Roles = "User")]
+        [Authorize(Roles = "Customer")]
 
         public async Task<IActionResult> GetAccount(string accountNumber,CancellationToken ct)
         {
@@ -65,20 +95,20 @@ namespace FinCore.Controllers
 
         //CREATE ACCOUNT
         [HttpPost]
-        [Authorize(Roles = "User")]
+        [Authorize(Roles = "Customer")]
 
-        public async Task<IActionResult> OpenAccount([FromQuery] CurrencyCode currency,CancellationToken ct)
+        public async Task<IActionResult> OpenAccount([FromQuery] OpenAccountRequest model,CancellationToken ct)
         {
             var userId = GetUserId();
 
-            var acc = await _accountService.OpenAccountAsync(userId,currency,ct);
+            var acc = await _accountService.OpenAccountAsync(userId,model.Currency,model.Name,ct);
 
             return this.ToActionResult(_commonResponse.Success(acc));
         }
 
         //CLOSE ACCOUNT
         [HttpPost("{accountNumber}/close")]
-        [Authorize(Roles = "User")]
+        [Authorize(Roles = "Customer")]
 
         public async Task<IActionResult> CloseAccount(string accountNumber,CancellationToken ct)
         {
@@ -89,41 +119,30 @@ namespace FinCore.Controllers
             return this.ToActionResult(_commonResponse.NoContent());
         }
 
-        // FREEZE ACCOUNT
-        [HttpPatch("{accountNumber}/freeze")]
-        [Authorize(Roles = "Admin")]
 
-        public async Task<IActionResult> FreezeAccount(string accountNumber,CancellationToken ct)
-        {
-
-            await _accountService.FreezeAccountAsync(accountNumber,ct);
-
-            return this.ToActionResult(_commonResponse.NoContent());
-        }
-
-        // UNFREEZE ACCOUNT
-        [HttpPatch("{accountNumber}/unfreeze")]
-        [Authorize(Roles = "Admin")]
-
-        public async Task<IActionResult> UnfreezeAccount(string accountNumber, CancellationToken ct)
-        {
-
-            await _accountService.UnfreezeAccountAsync(accountNumber, ct);
-
-            return this.ToActionResult(_commonResponse.NoContent());
-        }
 
         // DEPOSIT 
         [HttpPost("{accountNumber}/deposit")]
-        [Authorize(Roles = "User")]
+        [Authorize(Roles = "Customer")]
         public async Task<IActionResult> Deposit(
-    string accountNumber,
-    [FromHeader(Name = "Idempotency-Key")] string idempotencyKey,
-    [FromBody] DepositRequest request,
-    CancellationToken ct)
+        string accountNumber,
+        [FromHeader(Name = "Idempotency-Key")] string idempotencyKey,
+        [FromBody] DepositRequest request,
+        CancellationToken ct)
         {
             var result = await _accountService.DepositAsync(
                 GetUserId(), accountNumber, request.Amount, idempotencyKey, ct);
+
+            return this.ToActionResult(_commonResponse.Success(result));
+        }
+
+        [HttpPatch("{accountNumber}/name")]
+        [Authorize(Roles = "Customer")]
+        public async Task<IActionResult> Rename(
+        string accountNumber, [FromBody] RenameAccountRequest request, CancellationToken ct)
+        {
+            var result = await _accountService.RenameAccountAsync(
+                GetUserId(), accountNumber, request.Name, ct);
 
             return this.ToActionResult(_commonResponse.Success(result));
         }

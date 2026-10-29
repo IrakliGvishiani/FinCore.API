@@ -1,5 +1,7 @@
-﻿using FinCore.Application.Models.AuthModels;
+﻿using FinCore.Application.Models.Audit;
+using FinCore.Application.Models.AuthModels;
 using FinCore.Application.Models.BankAccountDtos;
+using FinCore.Application.Models.ProfileDtos;
 using FinCore.Domain.Entities;
 using Mapster;
 using System;
@@ -24,6 +26,10 @@ namespace FinCore.Application.Mapping
             config.NewConfig<BankAccount, OpenAccountResponseDto>();
 
             config.NewConfig<BankAccount, AccountForGettingDto>();
+
+            config.NewConfig<ApplicationUser, ProfileDto>();
+
+            config.NewConfig<AuditLog, AuditLogDto>();
         }
     }
 }

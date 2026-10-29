@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace FinCore.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class Initial : Migration
+    public partial class InitialCreate : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -51,6 +51,23 @@ namespace FinCore.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "LedgerAccounts",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    AccountCode = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: false),
+                    Name = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
+                    Currency = table.Column<string>(type: "nvarchar(3)", maxLength: 3, nullable: false),
+                    IsActive = table.Column<bool>(type: "bit", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_LedgerAccounts", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Roles",
                 columns: table => new
                 {
@@ -72,6 +89,8 @@ namespace FinCore.Infrastructure.Migrations
                     PersonalNumber = table.Column<string>(type: "nvarchar(11)", maxLength: 11, nullable: false),
                     FirstName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
                     LastName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
+                    ProfilePhotoUrl = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    ProfilePhotoPublicId = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     UserName = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
                     NormalizedUserName = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
@@ -121,11 +140,13 @@ namespace FinCore.Infrastructure.Migrations
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
                     AccountNumber = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
+                    Name = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
                     UserId = table.Column<string>(type: "nvarchar(450)", maxLength: 450, nullable: false),
                     Currency = table.Column<string>(type: "nvarchar(3)", maxLength: 3, nullable: false),
                     Balance = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false),
                     Status = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    RowVersion = table.Column<byte[]>(type: "rowversion", rowVersion: true, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -224,6 +245,47 @@ namespace FinCore.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "CurrencyConversions",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    InitiatedByUserId = table.Column<string>(type: "nvarchar(450)", maxLength: 450, nullable: false),
+                    FromAccountId = table.Column<int>(type: "int", nullable: false),
+                    ToAccountId = table.Column<int>(type: "int", nullable: false),
+                    FromCurrency = table.Column<string>(type: "nvarchar(3)", maxLength: 3, nullable: false),
+                    ToCurrency = table.Column<string>(type: "nvarchar(3)", maxLength: 3, nullable: false),
+                    FromAmount = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false),
+                    ToAmount = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false),
+                    Rate = table.Column<decimal>(type: "decimal(18,8)", precision: 18, scale: 8, nullable: false),
+                    RateDate = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    Reference = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
+                    IdempotencyKey = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_CurrencyConversions", x => x.Id);
+                    table.CheckConstraint("CK_CurrencyConversions_DifferentAccounts", "[FromAccountId] <> [ToAccountId]");
+                    table.CheckConstraint("CK_CurrencyConversions_DifferentCurrencies", "[FromCurrency] <> [ToCurrency]");
+                    table.CheckConstraint("CK_CurrencyConversions_FromAmount_Positive", "[FromAmount] > 0");
+                    table.CheckConstraint("CK_CurrencyConversions_Rate_Positive", "[Rate] > 0");
+                    table.CheckConstraint("CK_CurrencyConversions_ToAmount_Positive", "[ToAmount] > 0");
+                    table.ForeignKey(
+                        name: "FK_CurrencyConversions_BankAccounts_FromAccountId",
+                        column: x => x.FromAccountId,
+                        principalTable: "BankAccounts",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_CurrencyConversions_BankAccounts_ToAccountId",
+                        column: x => x.ToAccountId,
+                        principalTable: "BankAccounts",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Transfers",
                 columns: table => new
                 {
@@ -232,12 +294,14 @@ namespace FinCore.Infrastructure.Migrations
                     FromAccountId = table.Column<int>(type: "int", nullable: false),
                     ToAccountId = table.Column<int>(type: "int", nullable: false),
                     Amount = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false),
-                    Currency = table.Column<string>(type: "nvarchar(3)", maxLength: 3, nullable: false),
+                    Currency = table.Column<int>(type: "int", maxLength: 3, nullable: false),
                     Status = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
                     Description = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
+                    InitiatedByUserId = table.Column<string>(type: "nvarchar(450)", maxLength: 450, nullable: false),
                     IdempotencyKey = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    CompletedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
+                    CompletedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    FailureReason = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true)
                 },
                 constraints: table =>
                 {
@@ -265,6 +329,7 @@ namespace FinCore.Infrastructure.Migrations
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
                     TransferId = table.Column<int>(type: "int", nullable: true),
+                    Currency = table.Column<string>(type: "nvarchar(3)", maxLength: 3, nullable: false),
                     Reference = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
@@ -286,7 +351,8 @@ namespace FinCore.Infrastructure.Migrations
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
                     LedgerTransactionId = table.Column<int>(type: "int", nullable: false),
-                    BankAccountId = table.Column<int>(type: "int", nullable: false),
+                    BankAccountId = table.Column<int>(type: "int", nullable: true),
+                    LedgerAccountId = table.Column<int>(type: "int", nullable: true),
                     Amount = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false),
                     Type = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
                     Currency = table.Column<string>(type: "nvarchar(3)", maxLength: 3, nullable: false),
@@ -296,10 +362,17 @@ namespace FinCore.Infrastructure.Migrations
                 {
                     table.PrimaryKey("PK_LedgerEntries", x => x.Id);
                     table.CheckConstraint("CK_LedgerEntries_Amount_Positive", "[Amount] > 0");
+                    table.CheckConstraint("CK_LedgerEntries_ExactlyOneAccount", "([BankAccountId] IS NOT NULL AND [LedgerAccountId] IS NULL) OR ([BankAccountId] IS NULL AND [LedgerAccountId] IS NOT NULL)");
                     table.ForeignKey(
                         name: "FK_LedgerEntries_BankAccounts_BankAccountId",
                         column: x => x.BankAccountId,
                         principalTable: "BankAccounts",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_LedgerEntries_LedgerAccounts_LedgerAccountId",
+                        column: x => x.LedgerAccountId,
+                        principalTable: "LedgerAccounts",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
@@ -332,15 +405,48 @@ namespace FinCore.Infrastructure.Migrations
                 column: "UserId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_CurrencyConversions_FromAccountId",
+                table: "CurrencyConversions",
+                column: "FromAccountId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_CurrencyConversions_InitiatedByUserId_IdempotencyKey",
+                table: "CurrencyConversions",
+                columns: new[] { "InitiatedByUserId", "IdempotencyKey" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_CurrencyConversions_Reference",
+                table: "CurrencyConversions",
+                column: "Reference",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_CurrencyConversions_ToAccountId",
+                table: "CurrencyConversions",
+                column: "ToAccountId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_CurrencyExchangeRates_FromCurrency_ToCurrency_EffectiveAt",
                 table: "CurrencyExchangeRates",
                 columns: new[] { "FromCurrency", "ToCurrency", "EffectiveAt" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_LedgerAccounts_AccountCode",
+                table: "LedgerAccounts",
+                column: "AccountCode",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_LedgerEntries_BankAccountId",
                 table: "LedgerEntries",
                 column: "BankAccountId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_LedgerEntries_LedgerAccountId",
+                table: "LedgerEntries",
+                column: "LedgerAccountId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_LedgerEntries_LedgerTransactionId",
@@ -378,9 +484,9 @@ namespace FinCore.Infrastructure.Migrations
                 column: "FromAccountId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Transfers_IdempotencyKey",
+                name: "IX_Transfers_InitiatedByUserId_IdempotencyKey",
                 table: "Transfers",
-                column: "IdempotencyKey",
+                columns: new[] { "InitiatedByUserId", "IdempotencyKey" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
@@ -429,6 +535,9 @@ namespace FinCore.Infrastructure.Migrations
                 name: "AuditLogs");
 
             migrationBuilder.DropTable(
+                name: "CurrencyConversions");
+
+            migrationBuilder.DropTable(
                 name: "CurrencyExchangeRates");
 
             migrationBuilder.DropTable(
@@ -448,6 +557,9 @@ namespace FinCore.Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "UserTokens");
+
+            migrationBuilder.DropTable(
+                name: "LedgerAccounts");
 
             migrationBuilder.DropTable(
                 name: "LedgerTransactions");

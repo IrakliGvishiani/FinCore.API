@@ -82,6 +82,12 @@ namespace FinCore.Infrastructure.Migrations
                     b.Property<bool>("PhoneNumberConfirmed")
                         .HasColumnType("bit");
 
+                    b.Property<string>("ProfilePhotoPublicId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ProfilePhotoUrl")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("nvarchar(max)");
 
@@ -147,9 +153,13 @@ namespace FinCore.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Action");
+
                     b.HasIndex("CreatedAt");
 
                     b.HasIndex("UserId");
+
+                    b.HasIndex("EntityName", "EntityId");
 
                     b.ToTable("AuditLogs");
                 });
@@ -179,6 +189,11 @@ namespace FinCore.Infrastructure.Migrations
                         .HasMaxLength(3)
                         .HasColumnType("nvarchar(3)");
 
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
                         .IsRequired()
@@ -203,6 +218,86 @@ namespace FinCore.Infrastructure.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("BankAccounts");
+                });
+
+            modelBuilder.Entity("FinCore.Domain.Entities.CurrencyConversion", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("FeeAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("FeeRate")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("decimal(9,6)");
+
+                    b.Property<int>("FromAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("FromAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("FromCurrency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("InitiatedByUserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<decimal>("Rate")
+                        .HasPrecision(18, 8)
+                        .HasColumnType("decimal(18,8)");
+
+                    b.Property<DateTime>("RateDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("ToAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("ToAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("ToCurrency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FromAccountId");
+
+                    b.HasIndex("Reference")
+                        .IsUnique();
+
+                    b.HasIndex("ToAccountId");
+
+                    b.HasIndex("InitiatedByUserId", "IdempotencyKey")
+                        .IsUnique();
+
+                    b.ToTable("CurrencyConversions");
                 });
 
             modelBuilder.Entity("FinCore.Domain.Entities.CurrencyExchangeRate", b =>
@@ -249,6 +344,43 @@ namespace FinCore.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("FinCore.Domain.Entities.LedgerAccount", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AccountCode")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccountCode")
+                        .IsUnique();
+
+                    b.ToTable("LedgerAccounts");
+                });
+
             modelBuilder.Entity("FinCore.Domain.Entities.LedgerEntry", b =>
                 {
                     b.Property<int>("Id")
@@ -261,7 +393,7 @@ namespace FinCore.Infrastructure.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
-                    b.Property<int>("BankAccountId")
+                    b.Property<int?>("BankAccountId")
                         .HasColumnType("int");
 
                     b.Property<DateTime>("CreatedAt")
@@ -271,6 +403,9 @@ namespace FinCore.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(3)
                         .HasColumnType("nvarchar(3)");
+
+                    b.Property<int?>("LedgerAccountId")
+                        .HasColumnType("int");
 
                     b.Property<int>("LedgerTransactionId")
                         .HasColumnType("int");
@@ -284,11 +419,15 @@ namespace FinCore.Infrastructure.Migrations
 
                     b.HasIndex("BankAccountId");
 
+                    b.HasIndex("LedgerAccountId");
+
                     b.HasIndex("LedgerTransactionId");
 
                     b.ToTable("LedgerEntries", t =>
                         {
                             t.HasCheckConstraint("CK_LedgerEntries_Amount_Positive", "[Amount] > 0");
+
+                            t.HasCheckConstraint("CK_LedgerEntries_ExactlyOneAccount", "([BankAccountId] IS NOT NULL AND [LedgerAccountId] IS NULL) OR ([BankAccountId] IS NULL AND [LedgerAccountId] IS NOT NULL)");
                         });
                 });
 
@@ -346,9 +485,10 @@ namespace FinCore.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int>("Currency")
+                    b.Property<string>("Currency")
+                        .IsRequired()
                         .HasMaxLength(3)
-                        .HasColumnType("int");
+                        .HasColumnType("nvarchar(3)");
 
                     b.Property<string>("Description")
                         .HasMaxLength(500)
@@ -540,13 +680,36 @@ namespace FinCore.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("FinCore.Domain.Entities.CurrencyConversion", b =>
+                {
+                    b.HasOne("FinCore.Domain.Entities.BankAccount", "FromAccount")
+                        .WithMany()
+                        .HasForeignKey("FromAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FinCore.Domain.Entities.BankAccount", "ToAccount")
+                        .WithMany()
+                        .HasForeignKey("ToAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("FromAccount");
+
+                    b.Navigation("ToAccount");
+                });
+
             modelBuilder.Entity("FinCore.Domain.Entities.LedgerEntry", b =>
                 {
                     b.HasOne("FinCore.Domain.Entities.BankAccount", "BankAccount")
                         .WithMany("LedgerEntries")
                         .HasForeignKey("BankAccountId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("FinCore.Domain.Entities.LedgerAccount", "LedgerAccount")
+                        .WithMany()
+                        .HasForeignKey("LedgerAccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("FinCore.Domain.Entities.LedgerTransaction", "LedgerTransaction")
                         .WithMany("Entries")
@@ -555,6 +718,8 @@ namespace FinCore.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("BankAccount");
+
+                    b.Navigation("LedgerAccount");
 
                     b.Navigation("LedgerTransaction");
                 });

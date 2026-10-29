@@ -31,11 +31,11 @@ namespace FinCore.Application.Services
         }
 
         public async Task<bool> TryAcquireRateLimitAsync(
-    string keyPrefix,
-    string userId,
-    int maxRequests,
-    TimeSpan cooldown,
-    TimeSpan window)
+            string keyPrefix,
+            string userId,
+            int maxRequests,
+            TimeSpan cooldown,
+            TimeSpan window)
         {
             var cooldownKey = $"{keyPrefix}:cooldown:{userId}";
             var countKey = $"{keyPrefix}:count:{userId}";

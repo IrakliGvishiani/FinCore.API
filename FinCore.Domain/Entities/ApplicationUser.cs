@@ -13,6 +13,9 @@ namespace FinCore.Domain.Entities
 
         public string LastName { get; set; } = null!;
 
+        public string? ProfilePhotoUrl { get; set; }
+        public string? ProfilePhotoPublicId { get; set; }
+
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         public ICollection<BankAccount> BankAccounts { get; set; }

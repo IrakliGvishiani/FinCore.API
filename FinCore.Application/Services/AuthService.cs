@@ -1,6 +1,7 @@
 ﻿using FinCore.Application.Contracts.Persistence;
 using FinCore.Application.Contracts.Services;
 using FinCore.Application.Exceptions;
+using FinCore.Application.Models.Audit;
 using FinCore.Application.Models.AuthModels;
 using FinCore.Domain.Entities;
 using MapsterMapper;
@@ -27,9 +28,11 @@ namespace FinCore.Application.Services
         private readonly IConfiguration _configuration;
         private readonly IRedisService _redisService;
         private readonly IMapper _mapper;
+        private readonly IAuditService _audit;
 
         private const string _adminRole = "Admin";
-        private const string _guestRole = "User";
+        private const string _guestRole = "Customer";
+        private const string _managerRole = "Manager";
 
         private static readonly Regex EmailRegex = new Regex(
             @"^[^@\s]+@[^@\s]+\.[^@\s]+$",
@@ -50,7 +53,8 @@ namespace FinCore.Application.Services
             IMapper mapper,
             IEmailService emailService,
             IRedisService redisService,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            IAuditService auditService)
         {
             _unitOfWork = unitOfWork;
             _userManager = userManager;
@@ -60,12 +64,21 @@ namespace FinCore.Application.Services
             _emailService = emailService;
             _redisService = redisService;
             _configuration = configuration;
+            _audit = auditService;
+            
         }
 
 
         public async Task<string> RegisterAdminAsync(UserRegistrationDto model)
         {
             var user = await RegisterAsync(model, _adminRole);
+            await SendConfirmationCodeAsync(user);
+            return user.Id;
+        }
+
+        public async Task<string> RegisterManagerAsync(UserRegistrationDto model)
+        {
+            var user = await RegisterAsync(model,_managerRole);
             await SendConfirmationCodeAsync(user);
             return user.Id;
         }
@@ -85,20 +98,35 @@ namespace FinCore.Application.Services
         {
             var user = await _userManager.FindByNameAsync(model.UserName);
             if (user == null)
+            {
+                await _audit.LogAsync(null, AuditActions.LoginFailed, AuditEntities.User,
+                   null, $"Unknown user");
+
                 throw new NotFoundException("User not found.");
+            }
+                
 
             if (!user.EmailConfirmed)
                 throw new BadRequestException("Email is not confirmed.");
 
             if (await _userManager.IsLockedOutAsync(user))
-                throw new BadRequestException("Your account is locked.");
+            {
+                await _audit.LogAsync(user.Id,AuditActions.LoginFailed,AuditEntities.User,
+                    user.Id,$"Account banned for 10 minutes due to 5 wrong attempts");
+                throw new BadRequestException("Your account is banned for 10 minutes");
+                
+            }
+                
 
             bool isValid = await _userManager.CheckPasswordAsync(user, model.Password);
 
             if (!isValid)
             {
                 await _userManager.AccessFailedAsync(user);
-                throw new BadRequestException("Username or Password is Incorrect!");
+                await _audit.LogAsync(user.Id,AuditActions.LoginFailed,AuditEntities.User,
+                    user.Id,"Incorrect password");
+                throw new BadRequestException("Password is Incorrect!");
+                
             }
             else
             {
@@ -106,7 +134,8 @@ namespace FinCore.Application.Services
             }
 
             var roles = await _userManager.GetRolesAsync(user);
-
+             await _audit.LogAsync(user.Id,AuditActions.LoginSucceeded,AuditEntities.User,
+                user.Id,null);
             return await GenerateTokenPairAsync(user, roles);
 
 
@@ -256,6 +285,8 @@ namespace FinCore.Application.Services
                     throw new BadRequestException(
                         roleResult.Errors.First().Description);
                 }
+                await _audit.LogAsync(user.Id,AuditActions.Registered,AuditEntities.User,
+                    user.Id,"user registered successfully");
 
                 await _unitOfWork.CommitTransactionAsync();
 
@@ -393,6 +424,9 @@ namespace FinCore.Application.Services
         </html>
         """;
 
+            await _audit.LogAsync(user.Id,AuditActions.PasswordResetRequested,AuditEntities.User,
+                user.Id,"Password reset requested");
+
             await _emailService.Send(
                 user.Email!,
                 "Reset Password",
@@ -428,6 +462,9 @@ namespace FinCore.Application.Services
                 throw new BadRequestException(
                     result.Errors.First().Description);
             }
+
+            await _audit.LogAsync(user.Id,AuditActions.PasswordResetCompleted,AuditEntities.User,
+                user.Id,"Password changed");
         }
     }
 }

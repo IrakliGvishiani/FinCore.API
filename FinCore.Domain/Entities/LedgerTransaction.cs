@@ -6,7 +6,17 @@ using System.Text;
 
 namespace FinCore.Domain.Entities
 {
-    public readonly record struct LedgerLine(int BankAccountId, EntryType Type, decimal Amount);
+
+    public readonly record struct LedgerLine(
+    int? BankAccountId, int? LedgerAccountId, EntryType Type, decimal Amount)
+    {
+        public static LedgerLine ForCustomer(int bankAccountId, EntryType type, decimal amount)
+            => new(bankAccountId, null, type, amount);
+
+        public static LedgerLine ForSystem(int ledgerAccountId, EntryType type, decimal amount)
+            => new(null, ledgerAccountId, type, amount);
+    }
+    
 
     public class LedgerTransaction
     {
@@ -89,16 +99,39 @@ namespace FinCore.Domain.Entities
             };
 
             foreach (var l in list)
-                tx._entries.Add(new LedgerEntry(l.BankAccountId, l.Type, l.Amount, currency, now));
+                tx._entries.Add(new LedgerEntry(l.BankAccountId,l.LedgerAccountId, l.Type, l.Amount, currency, now));
 
             return tx;
         }
 
-        public static LedgerTransaction CreateDeposit(string reference,CurrencyCode currency,
-            int bankAccountId,decimal amount)
+        public static LedgerTransaction CreateDeposit(
+    string reference, BankAccount customer, LedgerAccount cash, decimal amount)
+        {
+            if (!cash.IsActive)
+                throw new DomainException("Cash ledger account is inactive.");
+            if (customer.Currency != cash.Currency)
+                throw new DomainException("Ledger account currency must match the account currency.");
+
+            return Create(reference, customer.Currency, new[]
+            {
+        LedgerLine.ForSystem(cash.Id, EntryType.Debit, amount),
+        LedgerLine.ForCustomer(customer.Id, EntryType.Credit, amount)
+    });
+        }
+
+        public static LedgerTransaction CreateSingleEntry(
+            string reference,
+            CurrencyCode currency,
+            int bankAccountId,
+            EntryType type,
+            decimal amount)
         {
             if (string.IsNullOrWhiteSpace(reference))
                 throw new DomainException("Reference is required.");
+            if (!Enum.IsDefined(currency))
+                throw new DomainException("Invalid currency.");
+            if (!Enum.IsDefined(type))
+                throw new DomainException("Invalid entry type.");
             if (amount <= 0 || decimal.Round(amount, 2) != amount)
                 throw new DomainException("Amount must be positive with at most 2 decimals.");
 
@@ -108,13 +141,15 @@ namespace FinCore.Domain.Entities
             {
                 Reference = reference.Trim(),
                 Currency = currency,
-                TransferId = null,
+                TransferId = null,          
                 CreatedAt = now
             };
 
-            tx._entries.Add(new LedgerEntry(bankAccountId,EntryType.Credit,amount,currency,now));
-
+            tx._entries.Add(new LedgerEntry(bankAccountId, type, amount, currency, now));
             return tx;
         }
+
+
     }
+
 }

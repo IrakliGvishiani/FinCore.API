@@ -1,5 +1,6 @@
 ﻿using FinCore.Application.Contracts.Services;
 using FinCore.Application.Exceptions;
+using FinCore.Application.Models.TransferDtos;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.ComponentModel.DataAnnotations;
@@ -8,15 +9,11 @@ using System.Security.Claims;
 namespace FinCore.Controllers
 {
 
-    public record CreateTransferRequest(
-         [Required] string FromAccountNumber,
-    [Required] string ToAccountNumber,
-    [Range(0.01, 1_000_000)] decimal Amount,
-    [StringLength(500)] string? Description);
+
 
     [Route("api/transfers")]
     [ApiController]
-    [Authorize(Roles = "User")]
+    [Authorize(Roles = "Customer")]
     public class TransferController : ControllerBase
     {
         private readonly ITransferService _transferService;
@@ -35,26 +32,6 @@ namespace FinCore.Controllers
         private string GetUserId() =>
             User.FindFirstValue(ClaimTypes.NameIdentifier)
             ?? throw new NotFoundException("User ID not found");
-
-        [HttpPost]
-
-        public async Task<IActionResult> Execute(
-            [FromHeader(Name = "Idempotency-Key")] string idempotencyKey,
-            [FromBody] CreateTransferRequest request,
-            CancellationToken ct
-            )
-        {
-            var result = await _transferService.ExecuteTransferAsync(
-                GetUserId(),request.FromAccountNumber,
-                request.ToAccountNumber,
-                request.Amount,
-                idempotencyKey,
-                request.Description,
-                ct
-                );
-
-            return this.ToActionResult(_commonResponse.Success(result));
-        }
 
         [HttpGet]
         public async Task<IActionResult> GetMyTransfers(
@@ -78,5 +55,53 @@ namespace FinCore.Controllers
 
             return this.ToActionResult(_commonResponse.Success(transfer));
         }
+
+        //[HttpGet("recipients/{personalNumber}/accounts")]
+        //public async Task<IActionResult> GetRecipientAccounts(
+        //    string personalNumber,
+        //    CancellationToken ct)
+        //{
+        //    var accounts = await _transferService.GetRecipientAccountAsync(
+        //        GetUserId(),
+        //        personalNumber, ct);
+
+        //    return this.ToActionResult(_commonResponse.Success(accounts));
+        //}
+
+        [HttpPost("recipients/lookup")]
+        public async Task<IActionResult> LookupRecipient(
+        [FromBody] RecipientLookupRequest request, CancellationToken ct)
+        {
+            var accounts = await _transferService.GetRecipientAccountAsync(
+                GetUserId(), request.PersonalNumber, ct);
+
+            return this.ToActionResult(_commonResponse.Success(accounts));
+        }
+        [HttpPost("by-account-number")]
+        public async Task<IActionResult> ByAccountNumber(
+        [FromHeader(Name = "Idempotency-Key")] string idempotencyKey,
+        [FromBody] TransferByAccountNumberRequest request,
+        CancellationToken ct)
+        {
+            var result = await _transferService.ExecuteTransferByAccountNumberAsync(
+                GetUserId(), request.FromAccountNumber, request.ToAccountNumber,
+                request.Amount, idempotencyKey, request.Description, ct);
+
+            return this.ToActionResult(_commonResponse.Success(result));
+        }
+
+        [HttpPost("by-recipient")]
+        public async Task<IActionResult> ByRecipient(
+        [FromHeader(Name = "Idempotency-Key")] string idempotencyKey,
+        [FromBody] TransferByRecipientRequest request,
+        CancellationToken ct)
+        {
+            var result = await _transferService.ExecuteTransferByRecipientAccountIdAsync(
+                GetUserId(), request.FromAccountNumber, request.ToAccountId,
+                request.Amount, idempotencyKey, request.Description, ct);
+
+            return this.ToActionResult(_commonResponse.Success(result));
+        }
+
     }
 }

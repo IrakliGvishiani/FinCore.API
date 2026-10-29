@@ -90,8 +90,8 @@ namespace FinCore.Domain.Entities
                 currency: Currency,
                 lines: new[]
                 {
-                    new LedgerLine(from.Id, EntryType.Debit, Amount),
-                    new LedgerLine(to.Id, EntryType.Credit, Amount)
+                     LedgerLine.ForCustomer(from.Id,EntryType.Debit,Amount),
+                     LedgerLine.ForCustomer(from.Id,EntryType.Credit,Amount)
                 },
                 transferId: Id
                 );

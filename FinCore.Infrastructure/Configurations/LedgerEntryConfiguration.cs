@@ -44,6 +44,16 @@ namespace FinCore.Infrastructure.Configurations
                 .WithMany(x => x.Entries)
                 .HasForeignKey(x => x.LedgerTransactionId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            builder.HasOne(x => x.LedgerAccount)
+            .WithMany()
+            .HasForeignKey(x => x.LedgerAccountId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+            builder.ToTable(t => t.HasCheckConstraint(
+                "CK_LedgerEntries_ExactlyOneAccount",
+                "([BankAccountId] IS NOT NULL AND [LedgerAccountId] IS NULL) " +
+                "OR ([BankAccountId] IS NULL AND [LedgerAccountId] IS NOT NULL)"));
         }
     }
 }

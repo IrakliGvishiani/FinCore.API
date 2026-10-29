@@ -1,12 +1,17 @@
-﻿using FinCore.Application.Contracts.Persistence;
+﻿using CloudinaryDotNet.Actions;
+using FinCore.Application.Contracts.Persistence;
 using FinCore.Application.Contracts.Services;
 using FinCore.Application.Exceptions;
+using FinCore.Application.Models.Audit;
 using FinCore.Application.Models.BankAccountDtos;
+using FinCore.Domain.DomainExceptions;
 using FinCore.Domain.Entities;
 using FinCore.Domain.Enums;
 using MapsterMapper;
+using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
+using System.Security.Cryptography.Xml;
 using System.Text;
 
 namespace FinCore.Application.Services
@@ -15,7 +20,9 @@ namespace FinCore.Application.Services
     {
         private readonly IRepositoryBase<BankAccount> _accounts;
         private readonly IRepositoryBase<LedgerTransaction> _ledgerTransactions;
+        private readonly IRepositoryBase<LedgerAccount> _ledgerAccounts;
         private readonly IUnitOfWork _unitOfWork;
+        private readonly IAuditService _audit;
         private readonly IMapper _mapper;
         private const decimal MaxDepositAmount = 10_100m;
 
@@ -23,13 +30,17 @@ namespace FinCore.Application.Services
             IRepositoryBase<BankAccount> account,
             IUnitOfWork unitOfWork,
             IMapper mapper,
-            IRepositoryBase<LedgerTransaction> ledgerTransactions
+            IRepositoryBase<LedgerTransaction> ledgerTransactions,
+            IRepositoryBase<LedgerAccount> ledgerAccounts,
+            IAuditService auditService
             )
         {
             _accounts = account;
             _unitOfWork = unitOfWork;
             _mapper = mapper;
             _ledgerTransactions = ledgerTransactions;
+            _ledgerAccounts = ledgerAccounts;
+            _audit = auditService;
             
         }
 
@@ -42,6 +53,11 @@ namespace FinCore.Application.Services
                 ) ?? throw new NotFoundException("Account not found!");
 
             account.Close(); //Rules are one domain
+
+            await _audit.RecordAsync(userId,AuditActions.AccountClosed,AuditEntities.BankAccount,
+                account.AccountNumber,
+                null,
+                ct);
 
             await _unitOfWork.SaveChangesAsync();
         }
@@ -56,6 +72,11 @@ namespace FinCore.Application.Services
                 ) ?? throw new NotFoundException("Account Not Found");
 
             account.Freeze();
+
+            await _audit.RecordAsync(null,AuditActions.AccountFrozen,AuditEntities.BankAccount,
+                account.AccountNumber,
+                null,
+                ct);
 
             await _unitOfWork.SaveChangesAsync();
         }
@@ -85,7 +106,10 @@ namespace FinCore.Application.Services
             return _mapper.Map<List<AccountForGettingDto>>(items);
         }
 
-        public async Task<OpenAccountResponseDto> OpenAccountAsync(string userId, CurrencyCode currency, CancellationToken ct = default)
+        public async Task<OpenAccountResponseDto> OpenAccountAsync(string userId,
+            CurrencyCode currency,
+            string name,
+            CancellationToken ct = default)
         {
             const int maxAttempts = 5;
 
@@ -94,13 +118,19 @@ namespace FinCore.Application.Services
                 var account = BankAccount.Create(
                     AccountNumberGenerator.Generate(),
                     userId,
-                    currency
+                    currency,
+                    name
                     );
 
                 await _accounts.AddAsync(account,ct);
 
                 try
                 {
+                    await _audit.RecordAsync(userId,AuditActions.AccountOpened,AuditEntities.BankAccount,
+                        account.AccountNumber,
+                        null,
+                        ct);
+
                     await _unitOfWork.SaveChangesAsync(ct);
                     return _mapper.Map<OpenAccountResponseDto>(account);
                 }
@@ -122,6 +152,11 @@ namespace FinCore.Application.Services
 
             account.Unfreeze();
 
+            await _audit.RecordAsync(null,AuditActions.AccountUnfrozen,AuditEntities.BankAccount,
+                account.AccountNumber,
+                null,
+                ct);
+
             await _unitOfWork.SaveChangesAsync();
         }
 
@@ -131,6 +166,13 @@ namespace FinCore.Application.Services
         {
             try
             {
+                if (string.IsNullOrWhiteSpace(key))
+                    throw new BadRequestException("Idempotency key is required.");
+
+                if (amount <= 0 || decimal.Round(amount, 2) != amount)
+                    throw new BadRequestException(
+                        "Amount must be positive with at most 2 decimals.");
+
                 await _unitOfWork.BeginTransactionAsync(ct);
 
                 var account = await _accounts.GetAsync(
@@ -139,24 +181,63 @@ namespace FinCore.Application.Services
                     cancellationToken: ct
                     ) ?? throw new NotFoundException("Account Not Found");
 
-                var reference = $"DEP:{userId}:{key}";
+                var reference = $"DEP:{userId}:{key.Trim()}";
 
-                if (await _ledgerTransactions.ExistsAsync(x => x.Reference == reference, ct))
+                var existing = await _ledgerTransactions.GetAsync(
+                    x => x.Reference == reference,
+                    includes: q => q.Include(x => x.Entries),
+                    tracking: false,
+                    cancellationToken: ct
+                    );
+
+                if(existing is not null)
                 {
-                    await _unitOfWork.RollbackTransactionAsync(ct);
+                    var customerEntry = existing.Entries.SingleOrDefault(
+                        x => x.BankAccountId == account.Id  
+                        &&
+                        x.Type == EntryType.Debit
+                        );
+
+                    var cashEntry = existing.Entries.SingleOrDefault(
+                        x => x.BankAccountId == account.Id
+                        &&
+                        x.Type == EntryType.Debit
+                        );
+
+                    var sameRequest =
+                        existing.Currency == account.Currency &&
+                        customerEntry is not null &&
+                        cashEntry is not null &&
+                        customerEntry.Amount == amount &&
+                        cashEntry.Amount == amount;
+
+                    if (!sameRequest)
+                        throw new ConflictException("IdempotencyKey has already been used for a different deposit");
+
+                    await _unitOfWork.RollbackTransactionAsync(CancellationToken.None);
+
                     return _mapper.Map<AccountForGettingDto>(account);
+
+                  
                 }
+
+                var cash = await _ledgerAccounts.GetAsync(
+                    x => x.AccountCode == LedgerAccountCodes.Cash(account.Currency),
+                    tracking: false,
+                    cancellationToken: ct
+                    ) ?? throw new InvalidOperationException("Bank cash ledger account is not configured.");
 
                 account.Credit(amount);
 
-                var tx = LedgerTransaction.CreateDeposit(
-                    reference,
-                    account.Currency,
-                    account.Id,
-                    amount
-                    );
+                var tx = LedgerTransaction.CreateDeposit(reference,account,cash,amount);
 
                 await _ledgerTransactions.AddAsync(tx,ct);
+
+                await _unitOfWork.SaveChangesAsync(ct);
+
+                await _audit.RecordAsync(userId,AuditActions.Deposit,AuditEntities.BankAccount
+                    ,account.AccountNumber,
+                    $"amount={amount} {account.Currency}",ct);
 
                 await _unitOfWork.SaveChangesAsync(ct);
                 await _unitOfWork.CommitTransactionAsync(ct);
@@ -165,7 +246,7 @@ namespace FinCore.Application.Services
             }
             catch
             {
-                await _unitOfWork.RollbackTransactionAsync(ct);
+                await _unitOfWork.RollbackTransactionAsync(CancellationToken.None);
                 throw;
             }
         }
@@ -200,6 +281,21 @@ namespace FinCore.Application.Services
                     await Task.Delay(Random.Shared.Next(20, 80) * attempts, ct);
                 }
             }
+        }
+
+        public async Task<AccountForGettingDto> RenameAccountAsync(string userId,
+            string accountNumber, 
+            string name, CancellationToken ct = default)
+        {
+            var account = await _accounts.GetAsync(
+                x => x.AccountNumber == accountNumber && x.UserId == userId,
+                cancellationToken: ct
+                ) ?? throw new NotFoundException("Account not found");
+
+            account.Rename(name);
+            await _unitOfWork.SaveChangesAsync(ct);
+
+            return _mapper.Map<AccountForGettingDto>(account);
         }
     }
 }
