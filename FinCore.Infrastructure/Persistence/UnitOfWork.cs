@@ -2,6 +2,7 @@
 using FinCore.Application.Exceptions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+using System.Data;
 
 namespace FinCore.Infrastructure.Persistence
 {
@@ -21,11 +22,13 @@ namespace FinCore.Infrastructure.Persistence
             { throw new DuplicateKeyException(); }
         }
 
-        public async Task BeginTransactionAsync(CancellationToken ct = default)
+        public async Task BeginTransactionAsync(
+            IsolationLevel isolationLevel = IsolationLevel.ReadCommitted,
+            CancellationToken ct = default)
         {
-            if (_transaction != null)
+            if (_transaction != null)   
                 throw new InvalidOperationException("Transaction already started.");
-            _transaction = await _context.Database.BeginTransactionAsync(ct);
+            _transaction = await _context.Database.BeginTransactionAsync(isolationLevel, ct);
         }
 
         public async Task CommitTransactionAsync(CancellationToken ct = default)

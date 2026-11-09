@@ -101,5 +101,24 @@ namespace FinCore.Controllers
 
             return this.ToActionResult(_commonResponse.Success(result));
         }
+
+        [HttpPatch("users/{userId}/ban")]
+        public async Task<IActionResult> BanUser(
+            string userId,
+            CancellationToken ct = default
+            )
+        {
+            await _userManagementService.LockUserAsync(userId,ct);
+
+            return this.ToActionResult(_commonResponse.NoContent());
+        }
+
+        [HttpPatch("users/{userId}/unban")]
+        public async Task<IActionResult> UnbanUser(string userId,CancellationToken ct = default)
+        {
+            await _userManagementService.UnlockUserAsync(userId,ct);
+
+            return this.ToActionResult(_commonResponse.NoContent());
+        }
     }
 }

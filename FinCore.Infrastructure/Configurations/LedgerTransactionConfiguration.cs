@@ -42,6 +42,11 @@ namespace FinCore.Infrastructure.Configurations
                 .HasField("_entries")
                 .UsePropertyAccessMode(PropertyAccessMode.Field);
 
+            builder.Property(x => x.TransactionType)
+            .HasConversion<string>()
+            .HasMaxLength(30)
+            .IsRequired();
+
         }
     }
 }

@@ -11,6 +11,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Text;
 
 namespace FinCore.Application.Services
@@ -158,7 +159,7 @@ namespace FinCore.Application.Services
 
             try
             {
-                await _uow.BeginTransactionAsync(ct);
+                await _uow.BeginTransactionAsync(ct: ct);
 
                 var existing = await _conversions.GetAsync(
                     x => x.InitiatedByUserId == userId && x.IdempotencyKey == key,

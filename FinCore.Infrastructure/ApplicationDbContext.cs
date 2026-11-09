@@ -41,5 +41,13 @@ namespace FinCore.Infrastructure
 
         public DbSet<LedgerAccount> LedgerAccounts { get; set; }
 
+        public DbSet<SuspiciousActivity> SuspiciousActivities { get; set; }
+
+        public DbSet<SavedRecipient> SavedRecipients { get; set; }
+
+        public DbSet<VirtualCard> VirtualCards { get; set; }
+
+        public DbSet<SimulatedPayment> SimulatedPayments { get; set; }
+
     }
 }

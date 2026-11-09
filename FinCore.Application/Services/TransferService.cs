@@ -7,6 +7,7 @@ using FinCore.Application.Models.TransferDtos;
 using FinCore.Domain.Entities;
 using FinCore.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -21,8 +22,10 @@ namespace FinCore.Application.Services
         private readonly IRepositoryBase<Transfer> _transferRepository;
         private readonly IRepositoryBase<LedgerTransaction> _ledgerRepository;
         private readonly IRepositoryBase<ApplicationUser> _userRepository;
+        private readonly ISuspiciousActivityDetectionService _suspiciousActivityDetectionService;
         private readonly IRedisService _redisService;
         private readonly IUnitOfWork _unitOfWork;
+        private readonly ILogger<TransferService> _logger;
         private readonly IAuditService _audit;
 
         public TransferService(IRepositoryBase<BankAccount> accountRepository,
@@ -31,7 +34,9 @@ namespace FinCore.Application.Services
             IUnitOfWork unitOfWork,
             IRepositoryBase<ApplicationUser> userRepository,
             IRedisService redisService,
-            IAuditService auditService)
+            IAuditService auditService,
+            ISuspiciousActivityDetectionService suspiciousActivityDetectionService,
+            ILogger<TransferService> logger)
         {
             _accountRepository = accountRepository;
             _transferRepository = transferRepository;
@@ -40,6 +45,8 @@ namespace FinCore.Application.Services
             _userRepository = userRepository;
             _redisService = redisService;
             _audit = auditService;
+            _suspiciousActivityDetectionService = suspiciousActivityDetectionService;
+            _logger = logger;
         }
 
         private static TransferDto ToDto(Transfer t, string fromNumber, string toNumber) => new()
@@ -218,7 +225,7 @@ namespace FinCore.Application.Services
 
             try
             {
-                await _unitOfWork.BeginTransactionAsync(cancellationToken);
+                await _unitOfWork.BeginTransactionAsync(ct:cancellationToken);
 
                 var from = await _accountRepository.GetAsync(
                     x => x.AccountNumber == fromAccountNumber
@@ -279,6 +286,8 @@ namespace FinCore.Application.Services
 
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
 
+                var balanceBeforeTransfer = from.Balance;
+
                 var ledgerTransaction = transfer.Execute(from, to);
 
                 await _ledgerRepository.AddAsync(
@@ -292,6 +301,21 @@ namespace FinCore.Application.Services
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
 
                 await _unitOfWork.CommitTransactionAsync(cancellationToken);
+
+
+                /// Suspicious activity detection
+                try
+                {
+                    await _suspiciousActivityDetectionService.CheckTransferAsync(transfer.Id,
+                        balanceBeforeTransfer, 
+                        cancellationToken);
+                }
+                catch(Exception ex)
+                {
+                   _logger.LogError(ex,
+                       "Error occurred during suspicious activity detection for transfer {TransferId}",
+                       transfer.Id);
+                }
 
                 return ToDto(transfer,from.AccountNumber,to.AccountNumber);
             }

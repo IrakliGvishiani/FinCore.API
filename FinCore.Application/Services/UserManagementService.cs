@@ -1,5 +1,7 @@
-﻿using FinCore.Application.Contracts.Services;
+﻿using FinCore.Application.Contracts.Persistence;
+using FinCore.Application.Contracts.Services;
 using FinCore.Application.Exceptions;
+using FinCore.Application.Models.Audit;
 using FinCore.Application.Models.BankAccountDtos;
 using FinCore.Application.Models.UserDtos;
 using FinCore.Domain.Entities;
@@ -15,12 +17,18 @@ namespace FinCore.Application.Services
     public class UserManagementService : IUserManagementService
     {
         private readonly UserManager<ApplicationUser> _userManager;
+        private readonly IAuditService _audit;
+        private readonly IUnitOfWork _uow;
 
         public UserManagementService(
-            UserManager<ApplicationUser> userManager
+            UserManager<ApplicationUser> userManager,
+            IAuditService auditService,
+            IUnitOfWork unitOfWork
             )
         {
             _userManager = userManager;
+            _audit = auditService;
+            _uow = unitOfWork;
         }
 
         public async Task<UserDetailsDto> GetUserByIdAsync(string userId, CancellationToken ct = default)
@@ -120,6 +128,54 @@ namespace FinCore.Application.Services
             }
 
             return (items, totalCount);
+        }
+
+        public async Task LockUserAsync(string userId, CancellationToken ct = default)
+        {
+            var user = await _userManager.FindByIdAsync(userId);
+
+            if (user == null)
+                throw new NotFoundException("User not found");
+
+            var roles = await _userManager.GetRolesAsync(user);
+
+            if (roles.Contains("Admin"))
+                throw new BadRequestException("Admin users cannot be banned through this operation.");
+
+            var result = await _userManager.SetLockoutEnabledAsync(user,true);
+
+            if (!result.Succeeded)
+                throw new BadRequestException(result.Errors.First().Description);
+
+            result = await _userManager.SetLockoutEndDateAsync(
+                user,DateTimeOffset.UtcNow.AddYears(100));
+
+            if (!result.Succeeded)
+                throw new BadRequestException(result.Errors.First().Description);
+
+            user.IsAdminLocked = true;
+            await _uow.SaveChangesAsync(ct);
+
+            await _audit.LogAsync(userId,AuditActions.UserLocked,AuditEntities.User,
+                userId,$"User {user.FirstName} {user.LastName} was banned by administrator");
+        }
+
+        public async Task UnlockUserAsync(string userId, CancellationToken ct = default)
+        {
+            var user = await _userManager.FindByIdAsync(userId);
+
+            if (user == null)
+                throw new NotFoundException("User not found");
+
+            var result = await _userManager.SetLockoutEndDateAsync(user,null);
+
+            if (!result.Succeeded)
+                throw new BadRequestException(result.Errors.First().Description);
+
+            user.IsAdminLocked = false;
+            await _uow.SaveChangesAsync(ct);
+            await _audit.LogAsync(userId,AuditActions.UserUnlocked,AuditEntities.User,
+                userId,"user got unbanned by administrator");
         }
     }
 }

@@ -93,5 +93,17 @@ namespace FinCore.Infrastructure.Persistence
             => predicate == null
                 ? _dbSet.CountAsync(cancellationToken)
                 : _dbSet.CountAsync(predicate, cancellationToken);
+
+        public async Task<int> CountDistinctAsync<TKey>(
+            Expression<Func<T, bool>> predicate,
+            Expression<Func<T, TKey>> selector,
+            CancellationToken cancellationToken = default)
+        {
+            return await _dbSet
+                .Where(predicate)
+                .Select(selector)
+                .Distinct()
+                .CountAsync(cancellationToken);
+        }
     }
 }

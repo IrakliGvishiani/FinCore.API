@@ -91,8 +91,9 @@ namespace FinCore.Domain.Entities
                 lines: new[]
                 {
                      LedgerLine.ForCustomer(from.Id,EntryType.Debit,Amount),
-                     LedgerLine.ForCustomer(from.Id,EntryType.Credit,Amount)
+                     LedgerLine.ForCustomer(to.Id,EntryType.Credit,Amount)
                 },
+                transactionType: LedgerTransactionType.Transfer,
                 transferId: Id
                 );
 

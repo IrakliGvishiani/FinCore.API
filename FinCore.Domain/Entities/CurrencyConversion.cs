@@ -98,12 +98,12 @@ namespace FinCore.Domain.Entities
 
              return new[]
             {
-                LedgerTransaction.Create($"{Reference}-OUT", FromCurrency, outLines),
+                LedgerTransaction.Create($"{Reference}-OUT", FromCurrency, outLines,LedgerTransactionType.CurrencyConversion),
                 LedgerTransaction.Create($"{Reference}-IN", ToCurrency, new[]
                 {
                     LedgerLine.ForSystem(fxTo.Id, EntryType.Debit,  ToAmount),
                     LedgerLine.ForCustomer(to.Id, EntryType.Credit, ToAmount)
-                })
+                }, LedgerTransactionType.CurrencyConversion)
             };
          
 

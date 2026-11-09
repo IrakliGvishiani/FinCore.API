@@ -31,7 +31,8 @@ namespace FinCore.Infrastructure.Seed
                 {
             (Code: LedgerAccountCodes.Cash(currency), Name: $"Bank cash ({currency})"),
             (Code: LedgerAccountCodes.Fx(currency),   Name: $"FX position ({currency})"),
-            (Code: LedgerAccountCodes.Fee(currency), Name: $"Conversion fee income ({currency})")
+            (Code: LedgerAccountCodes.Fee(currency), Name: $"Conversion fee income ({currency})"),
+            (Code: LedgerAccountCodes.CardSettlement(currency), Name: $"Virtual Card ({currency})")
         };
 
                 foreach (var (code, name) in items)

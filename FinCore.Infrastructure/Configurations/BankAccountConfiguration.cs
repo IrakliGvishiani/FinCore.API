@@ -50,5 +50,7 @@ public class BankAccountConfiguration : IEntityTypeConfiguration<BankAccount>
     .IsRequired()
     .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasIndex(x => new { x.UserId, x.Status });
+
     }
 }

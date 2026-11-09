@@ -2,6 +2,7 @@
 using FinCore.Application.Models.AuthModels;
 using FinCore.Application.Models.BankAccountDtos;
 using FinCore.Application.Models.ProfileDtos;
+using FinCore.Application.Models.VirtualCardDtos;
 using FinCore.Domain.Entities;
 using Mapster;
 using System;
@@ -27,9 +28,13 @@ namespace FinCore.Application.Mapping
 
             config.NewConfig<BankAccount, AccountForGettingDto>();
 
+            config.NewConfig<VirtualCard, VirtualCardDto>();
+
             config.NewConfig<ApplicationUser, ProfileDto>();
 
             config.NewConfig<AuditLog, AuditLogDto>();
+
+            config.NewConfig<SimulatedPayment, PaymentDto>();
         }
     }
 }

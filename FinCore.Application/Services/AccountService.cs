@@ -11,6 +11,7 @@ using MapsterMapper;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Security.Cryptography.Xml;
 using System.Text;
 
@@ -113,30 +114,53 @@ namespace FinCore.Application.Services
         {
             const int maxAttempts = 5;
 
-            for (var attempt = 1;attempt < maxAttempts ; attempt++)
-            {
-                var account = BankAccount.Create(
-                    AccountNumberGenerator.Generate(),
-                    userId,
-                    currency,
-                    name
-                    );
 
-                await _accounts.AddAsync(account,ct);
+
+            for (var attempt = 1;attempt <= maxAttempts ; attempt++)
+            {
+                await _unitOfWork.BeginTransactionAsync(IsolationLevel.Serializable, ct);
 
                 try
                 {
-                    await _audit.RecordAsync(userId,AuditActions.AccountOpened,AuditEntities.BankAccount,
+                    var accountCount = await _accounts.CountAsync(
+                       x => x.UserId == userId &&
+                       x.Status != AccountStatus.Closed
+                       );
+
+                    if (accountCount >= 5)
+                        throw new BadRequestException("You can only have up to 5 open accounts.");
+
+
+                    var account = BankAccount.Create(
+                        AccountNumberGenerator.Generate(),
+                        userId,
+                        currency,
+                        name
+                        );
+
+                    await _accounts.AddAsync(account, ct);
+
+
+                    await _audit.RecordAsync(userId, AuditActions.AccountOpened, AuditEntities.BankAccount,
                         account.AccountNumber,
                         null,
                         ct);
 
                     await _unitOfWork.SaveChangesAsync(ct);
+                    await _unitOfWork.CommitTransactionAsync(ct);
+
                     return _mapper.Map<OpenAccountResponseDto>(account);
                 }
+
                 catch(DuplicateKeyException ex) when (attempt < maxAttempts)
                 {
                     await _unitOfWork.ClearTracking();
+                }
+                catch
+                {
+                    await _unitOfWork.RollbackTransactionAsync(ct);
+                    await _unitOfWork.ClearTracking();
+                    throw;
                 }
             }
 
@@ -161,8 +185,8 @@ namespace FinCore.Application.Services
         }
 
         private async Task<AccountForGettingDto> TryDepositAsync(string userId,
-    string accountNumber,
-    decimal amount, string key, CancellationToken ct)
+            string accountNumber,
+            decimal amount, string key, CancellationToken ct)
         {
             try
             {
@@ -173,7 +197,7 @@ namespace FinCore.Application.Services
                     throw new BadRequestException(
                         "Amount must be positive with at most 2 decimals.");
 
-                await _unitOfWork.BeginTransactionAsync(ct);
+                await _unitOfWork.BeginTransactionAsync(IsolationLevel.Serializable, ct);
 
                 var account = await _accounts.GetAsync(
                     x => x.AccountNumber == accountNumber &&

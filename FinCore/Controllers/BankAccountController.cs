@@ -22,17 +22,20 @@ namespace FinCore.Controllers
         private readonly CommonResponse _commonResponse;
         private readonly IAccountService _accountService;
         private readonly IAccountStatementService _accountStatementService;
+        private readonly IAnalyticsService _analyticsService;
 
 
         public BankAccountController(
             CommonResponse commonResponse,
             IAccountService accountService,
-            IAccountStatementService accountStatementService
+            IAccountStatementService accountStatementService,
+            IAnalyticsService analyticsService
             )
         {
             _commonResponse = commonResponse;
             _accountService = accountService;
             _accountStatementService = accountStatementService;
+            _analyticsService = analyticsService;
         }
 
         private string GetUserId()
@@ -132,6 +135,25 @@ namespace FinCore.Controllers
         {
             var result = await _accountService.DepositAsync(
                 GetUserId(), accountNumber, request.Amount, idempotencyKey, ct);
+
+            return this.ToActionResult(_commonResponse.Success(result));
+        }
+
+        [HttpGet("analytics")]
+        [Authorize(Roles = "Customer")]
+
+        public async Task<IActionResult> GetOverview(
+            [FromQuery] DateTime fromDate,
+            [FromQuery] DateTime toDate,
+            CancellationToken ct = default
+            )
+        {
+            var result = await _analyticsService.GetOverviewAsync(
+                GetUserId(),
+                fromDate,
+                toDate,
+                ct
+                );
 
             return this.ToActionResult(_commonResponse.Success(result));
         }

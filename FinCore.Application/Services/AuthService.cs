@@ -109,14 +109,43 @@ namespace FinCore.Application.Services
             if (!user.EmailConfirmed)
                 throw new BadRequestException("Email is not confirmed.");
 
+            if (user.IsAdminLocked)
+            {
+                await _audit.LogAsync(
+                    user.Id,
+                    AuditActions.LoginFailed,
+                    AuditEntities.User,
+                    user.Id,
+                    "login attempted while account was administratively banned"
+                    );
+
+                throw new BadRequestException("Your account has been banned by administrator");
+            }
+
             if (await _userManager.IsLockedOutAsync(user))
             {
-                await _audit.LogAsync(user.Id,AuditActions.LoginFailed,AuditEntities.User,
-                    user.Id,$"Account banned for 10 minutes due to 5 wrong attempts");
-                throw new BadRequestException("Your account is banned for 10 minutes");
-                
+                var lockoutEnd = await _userManager.GetLockoutEndDateAsync(user);
+
+                if (lockoutEnd.HasValue)
+                {
+                    var remaining = lockoutEnd.Value - DateTimeOffset.UtcNow;
+
+                    if (remaining > TimeSpan.Zero)
+                    {
+                        await _audit.LogAsync(
+                            user.Id,
+                            AuditActions.LoginFailed,
+                            AuditEntities.User,
+                            user.Id,
+                            "Login attempted while account was banned");
+
+                        throw new BadRequestException(
+                            $"Your account is temporarily banned. Try again in approximately " +
+                            $"{(int)Math.Ceiling(remaining.TotalMinutes)} minute(s).");
+                    }
+                }
             }
-                
+
 
             bool isValid = await _userManager.CheckPasswordAsync(user, model.Password);
 

@@ -33,6 +33,11 @@ params Func<IQueryable<T>, IQueryable<T>>[] includes);
 
         Task<int> CountAsync(
     Expression<Func<T, bool>> predicate = null,CancellationToken cancellationToken = default);
+
+        Task<int> CountDistinctAsync<TKey>(
+            Expression<Func<T, bool>> predicate,
+            Expression<Func<T, TKey>> selector,
+            CancellationToken cancellationToken = default);
     }
 }
 

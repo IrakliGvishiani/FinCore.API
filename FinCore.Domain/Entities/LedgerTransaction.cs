@@ -29,6 +29,7 @@ namespace FinCore.Domain.Entities
         public int? TransferId { get; private set; }
         public Transfer? Transfer { get; private set; }
 
+        public LedgerTransactionType TransactionType { get; private set; }
         public CurrencyCode Currency { get; private set; }
         public string Reference { get; private set; } = null!;
 
@@ -40,6 +41,7 @@ namespace FinCore.Domain.Entities
             string reference,
             CurrencyCode currency,
             IEnumerable<LedgerLine> lines,
+            LedgerTransactionType transactionType,
             int? transferId = null
             )
         {
@@ -63,16 +65,30 @@ namespace FinCore.Domain.Entities
             if(list.Count < 2)
                 throw new DomainException("A ledger transaction must have at least two entries.");
 
+            if (!Enum.IsDefined(transactionType))
+             throw new DomainException("Invalid transaction type.");
+
             foreach (var l in list)
             {
                 if (!Enum.IsDefined(typeof(EntryType), l.Type))
-                    throw new DomainException("Invalid ledger entry type.");
-
-                if (l.BankAccountId <= 0)
-                    throw new DomainException("Bank account ID must be positive.");
+                    throw new DomainException("Invalid entry type.");
 
                 if (l.Amount <= 0 || decimal.Round(l.Amount, 2) != l.Amount)
-                    throw new DomainException("Entry amount must be positive with at most 2 decimals.");
+                    throw new DomainException(
+                        "Entry amount must be positive with at most 2 decimals.");
+
+                var hasBankAccount = l.BankAccountId.HasValue;
+                var hasLedgerAccount = l.LedgerAccountId.HasValue;
+
+                if (hasBankAccount == hasLedgerAccount)
+                    throw new DomainException(
+                        "Exactly one account reference must be provided.");
+
+                if (hasBankAccount && l.BankAccountId <= 0)
+                    throw new DomainException("Bank account ID must be positive.");
+
+                if (hasLedgerAccount && l.LedgerAccountId <= 0)
+                    throw new DomainException("Ledger account ID must be positive.");
             }
             var debits = list.Where(l => l.Type == EntryType.Debit).Sum(l => l.Amount);
             var credits = list.Where(l => l.Type == EntryType.Credit).Sum(l => l.Amount);
@@ -95,7 +111,8 @@ namespace FinCore.Domain.Entities
                 Reference = reference.Trim(),
                 Currency = currency,
                 CreatedAt = now,
-                TransferId = transferId
+                TransferId = transferId,
+                TransactionType = transactionType
             };
 
             foreach (var l in list)
@@ -114,9 +131,11 @@ namespace FinCore.Domain.Entities
 
             return Create(reference, customer.Currency, new[]
             {
-        LedgerLine.ForSystem(cash.Id, EntryType.Debit, amount),
-        LedgerLine.ForCustomer(customer.Id, EntryType.Credit, amount)
-    });
+            LedgerLine.ForSystem(cash.Id, EntryType.Debit, amount),
+            LedgerLine.ForCustomer(customer.Id, EntryType.Credit, amount)
+           },
+           LedgerTransactionType.Deposit
+           );
         }
 
         public static LedgerTransaction CreateSingleEntry(

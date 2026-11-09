@@ -18,5 +18,9 @@ namespace FinCore.Application.Contracts.Services
             string userId,
             CancellationToken ct = default
             );
+
+        Task LockUserAsync(string userId,CancellationToken ct = default);
+
+        Task UnlockUserAsync(string userId,CancellationToken ct = default);
     }
 }

@@ -11,5 +11,7 @@ namespace FinCore.Application.Models.BankAccountDtos
         public static string Fx(CurrencyCode c) => $"FX-{c}";
 
         public static string Fee(CurrencyCode c) => $"FEE-{c}";
+
+        public static string CardSettlement(CurrencyCode c) => $"CARD{c}";
     }
 }

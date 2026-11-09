@@ -18,6 +18,8 @@ namespace FinCore.Domain.Entities
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+        public bool IsAdminLocked { get; set; }
+
         public ICollection<BankAccount> BankAccounts { get; set; }
             = new List<BankAccount>();
 

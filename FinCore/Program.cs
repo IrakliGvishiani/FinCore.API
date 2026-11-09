@@ -5,6 +5,7 @@ using FinCore.Application.Exceptions;
 using FinCore.Application.Mapping;
 using FinCore.Application.Models.Cloudinary;
 using FinCore.Application.Models.ExchangeDtos;
+using FinCore.Application.Models.SuspiciousActivity;
 using FinCore.Application.Services;
 using FinCore.Domain.Entities;
 using FinCore.Infrastructure;
@@ -61,7 +62,9 @@ namespace FinCore
             //Repository
             builder.Services.AddScoped(typeof(IRepositoryBase<>), typeof(RepositoryBase<>));
             builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
-
+            builder.Services.AddScoped<IManagerRepository, ManagerRepository>();
+            builder.Services.AddScoped<ISavedRecipientRepository, SavedRecipientRepository>();
+            builder.Services.AddScoped<IAnalyticsRepository, AnalyticsRepository>();
 
             //Service
             builder.Services.AddScoped<ITransferService, TransferService>();
@@ -78,6 +81,13 @@ namespace FinCore
             builder.Services.AddScoped<IAccountStatementService,AccountStatementService>();
             builder.Services.AddScoped<IAuditService, AuditService>();
             builder.Services.AddScoped<IUserManagementService, UserManagementService>();
+            builder.Services.AddScoped<IManagerService, ManagerService>();
+            builder.Services.Configure<SuspiciousActivityOptions>(
+            builder.Configuration.GetSection(SuspiciousActivityOptions.SectionName));
+            builder.Services.AddScoped<ISuspiciousActivityDetectionService, SuspiciousActivityDetectionService>();
+            builder.Services.AddScoped<ISavedRecipientService, SavedRecipientService>();
+            builder.Services.AddScoped<IAnalyticsService, AnalyticsService>();
+            builder.Services.AddScoped<IVirtualCardService, VirtualCardService>();
 
             builder.Services.AddMemoryCache();
             builder.Services.AddHttpClient<IExchangeRateProvider, NbgExchangeRateProvider>(c =>
