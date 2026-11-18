@@ -232,10 +232,10 @@ namespace FinCore.Application.Services
                 code,
                 TimeSpan.FromMinutes(5));
 
-            //var baseUrl = _configuration["AppSettings:BaseUrl"];
+            var baseUrl = _configuration["AppSettings:FrontendBaseUrl"];
 
-            //var confirmationLink =
-            // $"{baseUrl}/confirm-email?email={Uri.EscapeDataString(user.Email)}";
+            var confirmationLink =
+             $"{baseUrl}/confirm-email?email={Uri.EscapeDataString(user.Email)}";
 
             await _emailService.Send(
                 user.Email,
@@ -247,7 +247,7 @@ namespace FinCore.Application.Services
 
         <p>Enter the code on the confirmation page:</p>
 
-        <a href=""
+        <a href="{confirmationLink}"
            style="
                background-color:#2563eb;
                color:white;
@@ -423,25 +423,25 @@ namespace FinCore.Application.Services
             var encodedToken = WebEncoders.Base64UrlEncode(
                 Encoding.UTF8.GetBytes(token));
 
-            //var baseUrl = _configuration["AppSettings:BaseUrl"];
+            var baseUrl = _configuration["AppSettings:FrontendBaseUrl"];
 
-            //if (string.IsNullOrWhiteSpace(baseUrl))
-            //    throw new InvalidOperationException(
-            //        "AppSettings:BaseUrl is not configured.");
+            if (string.IsNullOrWhiteSpace(baseUrl))
+                throw new InvalidOperationException(
+                    "AppSettings:BaseUrl is not configured.");
 
-            //var resetLink =
-            //    $"{baseUrl.TrimEnd('/')}/reset-password" +
-            //    $"?email={Uri.EscapeDataString(user.Email!)}" +
-            //    $"&token={Uri.EscapeDataString(encodedToken)}";
+            var resetLink =
+                $"{baseUrl.TrimEnd('/')}/reset-password" +
+                $"?email={Uri.EscapeDataString(user.Email!)}" +
+                $"&token={Uri.EscapeDataString(encodedToken)}";
 
             var emailBody = $"""
         <html>
         <body style="font-family: Arial, sans-serif; color: #1f2937;">
             <h2>Reset Your Password</h2>
             <p>We received a request to reset your password.</p>
-            <p>{encodedToken}<p>
+            <p>Click the buttton below<p>
             <p>
-                <a href=""
+                <a href="{resetLink}"
                    style="display:inline-block;padding:12px 24px;
                           background-color:#2563eb;color:#ffffff;
                           text-decoration:none;border-radius:6px;">

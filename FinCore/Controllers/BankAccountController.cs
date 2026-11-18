@@ -2,6 +2,7 @@
 using FinCore.Application.Contracts.Services;
 using FinCore.Application.Exceptions;
 using FinCore.Application.Models.BankAccountDtos;
+using FinCore.Domain.Constants;
 using FinCore.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -16,7 +17,7 @@ namespace FinCore.Controllers
 
     [Route("api/account")]
     [ApiController]
-    [Authorize]
+    [Authorize(Roles = Roles.Customer)]
     public class BankAccountController : Controller
     {
         private readonly CommonResponse _commonResponse;
@@ -46,7 +47,7 @@ namespace FinCore.Controllers
 
         //GET ACCOUNTS
         [HttpGet]
-        [Authorize(Roles = "Customer")]
+ 
 
         public async Task<IActionResult> GetMyAccounts(CancellationToken ct)
         {
@@ -58,7 +59,7 @@ namespace FinCore.Controllers
         }
 
         [HttpGet("{accountNumber}/statement")]
-        [Authorize(Roles = "Customer")]
+      
         public async Task<IActionResult> GetAccountStatement(
             string accountNumber,
             [FromQuery] DateTime? from,
@@ -84,7 +85,7 @@ namespace FinCore.Controllers
 
         //GET ACCOUNT BY ACCNUMBER
         [HttpGet("{accountNumber}")]
-        [Authorize(Roles = "Customer")]
+      
 
         public async Task<IActionResult> GetAccount(string accountNumber,CancellationToken ct)
         {
@@ -98,7 +99,7 @@ namespace FinCore.Controllers
 
         //CREATE ACCOUNT
         [HttpPost]
-        [Authorize(Roles = "Customer")]
+        
 
         public async Task<IActionResult> OpenAccount([FromQuery] OpenAccountRequest model,CancellationToken ct)
         {
@@ -111,7 +112,7 @@ namespace FinCore.Controllers
 
         //CLOSE ACCOUNT
         [HttpPost("{accountNumber}/close")]
-        [Authorize(Roles = "Customer")]
+       
 
         public async Task<IActionResult> CloseAccount(string accountNumber,CancellationToken ct)
         {
@@ -126,7 +127,7 @@ namespace FinCore.Controllers
 
         // DEPOSIT 
         [HttpPost("{accountNumber}/deposit")]
-        [Authorize(Roles = "Customer")]
+       
         public async Task<IActionResult> Deposit(
         string accountNumber,
         [FromHeader(Name = "Idempotency-Key")] string idempotencyKey,
@@ -140,7 +141,7 @@ namespace FinCore.Controllers
         }
 
         [HttpGet("analytics")]
-        [Authorize(Roles = "Customer")]
+      
 
         public async Task<IActionResult> GetOverview(
             [FromQuery] DateTime fromDate,
@@ -159,7 +160,7 @@ namespace FinCore.Controllers
         }
 
         [HttpPatch("{accountNumber}/name")]
-        [Authorize(Roles = "Customer")]
+      
         public async Task<IActionResult> Rename(
         string accountNumber, [FromBody] RenameAccountRequest request, CancellationToken ct)
         {

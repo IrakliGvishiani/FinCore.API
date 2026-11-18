@@ -1,6 +1,7 @@
 ﻿using FinCore.Application.Contracts.Services;
 using FinCore.Application.Exceptions;
 using FinCore.Application.Models.AuthModels;
+using FinCore.Domain.Constants;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Filters;
@@ -29,13 +30,14 @@ namespace FinCore.Controllers
             return this.ToActionResult(_commonResponse.Created(user));
         }
 
+        [Authorize(Roles = Roles.Admin)]
         [HttpPost("register-admin")]
         public async Task<IActionResult> RegisterAdmin([FromBody] UserRegistrationDto request)
         {
             var admin = await _authService.RegisterAdminAsync(request);
             return this.ToActionResult(_commonResponse.Created(admin));
         }
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = Roles.Admin)]
         [HttpPost("register-manager")]
         public async Task<IActionResult> RegisterManager([FromBody] UserRegistrationDto request)
         {

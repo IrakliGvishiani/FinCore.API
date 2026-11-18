@@ -1,6 +1,8 @@
 ﻿using FinCore.Application.Contracts.Services;
 using FinCore.Application.Exceptions;
 using FinCore.Application.Models.TransferDtos;
+using FinCore.Domain.Constants;
+using FinCore.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.ComponentModel.DataAnnotations;
@@ -13,19 +15,22 @@ namespace FinCore.Controllers
 
     [Route("api/transfers")]
     [ApiController]
-    [Authorize(Roles = "Customer")]
+    [Authorize(Roles = Roles.Customer)]
     public class TransferController : ControllerBase
     {
         private readonly ITransferService _transferService;
         private readonly CommonResponse _commonResponse;
+        private readonly IReceiptService _receiptService;
 
         public TransferController (
             ITransferService transferService,
-            CommonResponse commonResponse
+            CommonResponse commonResponse,
+            IReceiptService receiptService
             )
         {
             _transferService = transferService;
             _commonResponse = commonResponse;
+            _receiptService = receiptService;
              
         }
 
@@ -99,6 +104,27 @@ namespace FinCore.Controllers
             var result = await _transferService.ExecuteTransferByRecipientAccountIdAsync(
                 GetUserId(), request.FromAccountNumber, request.ToAccountId,
                 request.Amount, idempotencyKey, request.Description, ct);
+
+            return this.ToActionResult(_commonResponse.Success(result));
+        }
+
+        [Authorize]
+        [HttpGet("{transferId:int}/receipt")]
+        public async Task<IActionResult> DownloadReceipt(
+    int transferId,
+    CancellationToken ct)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            var pdfBytes = await _receiptService.GenerateTransferReceiptAsync(
+                userId,
+                transferId,
+                ct);
+
+            var result = File(
+                pdfBytes,
+                "application/pdf",
+                $"FinCore-Transfer-Receipt-{transferId}.pdf");
 
             return this.ToActionResult(_commonResponse.Success(result));
         }

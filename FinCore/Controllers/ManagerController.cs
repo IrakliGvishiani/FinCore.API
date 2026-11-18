@@ -2,6 +2,7 @@
 using FinCore.Application.Exceptions;
 using FinCore.Application.Models.ManagerDtos;
 using FinCore.Application.Models.SuspiciousActivity;
+using FinCore.Domain.Constants;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -10,7 +11,7 @@ namespace FinCore.Controllers
 {
     [Route("api/manager")]
     [ApiController]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = Roles.ManagerOrAdmin)]
     public class ManagerController : Controller
     {
         private readonly IManagerService _managerService;

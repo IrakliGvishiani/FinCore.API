@@ -1,9 +1,10 @@
 ﻿using FinCore.Application.Exceptions;
+using FinCore.Domain.DomainExceptions;
 using System.Text.Json;
 
 namespace FinCore.Middleware
 {
-    public class ErrorHandlingMiddleware(RequestDelegate next)
+    public class ErrorHandlingMiddleware(RequestDelegate next,ILogger<ErrorHandlingMiddleware> logger)
     {
 
         public async Task InvokeAsync(HttpContext context)
@@ -30,8 +31,17 @@ namespace FinCore.Middleware
                 DuplicateKeyException => StatusCodes.Status409Conflict,
                 ConflictException => StatusCodes.Status409Conflict,
                 ExternalServiceException => StatusCodes.Status503ServiceUnavailable,
+                InsufficientFundsException => StatusCodes.Status400BadRequest,
+                DomainException => StatusCodes.Status400BadRequest,
                 _ => StatusCodes.Status500InternalServerError
             };
+            if (statusCode == StatusCodes.Status500InternalServerError)
+                logger.LogError(ex, "Unhandled exception");
+
+            var message = statusCode == StatusCodes.Status500InternalServerError
+                ? "An unexpected error occurred."
+                : ex.Message;
+
 
             var response = new CommonResponse(ex.Message,null,false,statusCode);
 

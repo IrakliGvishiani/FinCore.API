@@ -32,6 +32,8 @@ namespace FinCore
     {
         public static async Task Main(string[] args)
         {
+            QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
+
             var builder = WebApplication.CreateBuilder(args);
 
             // Add services to the container.
@@ -88,6 +90,8 @@ namespace FinCore
             builder.Services.AddScoped<ISavedRecipientService, SavedRecipientService>();
             builder.Services.AddScoped<IAnalyticsService, AnalyticsService>();
             builder.Services.AddScoped<IVirtualCardService, VirtualCardService>();
+            builder.Services.AddScoped<IReceiptService, ReceiptService>();
+            builder.Services.AddScoped<ISimulatedPaymentService,SimulatedPaymentService>();
 
             builder.Services.AddMemoryCache();
             builder.Services.AddHttpClient<IExchangeRateProvider, NbgExchangeRateProvider>(c =>
@@ -101,6 +105,9 @@ namespace FinCore
 
             builder.Services.AddHttpContextAccessor();
             builder.Services.AddScoped<IRequestContext, HttpRequestContext>();
+
+            builder.Services.Configure<AdminSeedOptions>(
+            builder.Configuration.GetSection(AdminSeedOptions.SectionName));
 
             /// SWAGGER
             builder.Services.AddSwaggerGen(options =>
@@ -134,6 +141,21 @@ namespace FinCore
 
             builder.Services.AddSwaggerExamplesFromAssemblyOf<Program>();
 
+            // CORS
+            builder.Services.AddCors(options =>
+            {
+                options.AddPolicy("AngularApp", policy =>
+                {
+                    var frontendUrl = builder.Configuration["AppSettings:FrontendBaseUrl"]
+                                      ?? "http://localhost:4200";
+
+                    policy
+                        .WithOrigins(frontendUrl.TrimEnd('/'))
+                        .AllowAnyHeader()
+                        .AllowAnyMethod()
+                        .AllowCredentials();
+                });
+            });
 
             // IDENTITY
             builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
@@ -198,12 +220,13 @@ namespace FinCore
 
 
             var app = builder.Build();
-
+            app.MapGet("/health", () => Results.Ok("Healthy"));
             // Configure the HTTP request pipeline.
             app.UseMiddleware<ErrorHandlingMiddleware>();
             app.UseSwagger();
             app.UseSwaggerUI();
             app.UseHttpsRedirection();
+            app.UseCors("AngularApp");
             app.UseAuthentication();
             app.UseAuthorization();
 
@@ -214,9 +237,13 @@ namespace FinCore
             {
                 using (var scope = app.Services.CreateScope())
                 {
+                    var sp = scope.ServiceProvider;
                     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+
                     await db.Database.MigrateAsync();
                     await IdentitySeeder.SeedRolesAsync(scope.ServiceProvider);
+                    await AdminSeeder.SeedAsync(sp);
                     await IdentitySeeder.SeedLedgerAccountsAsync(db);
                 }
             }

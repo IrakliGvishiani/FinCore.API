@@ -7,6 +7,8 @@ namespace FinCore.Application.Models.BankAccountDtos
 {
     public class AccountForGettingDto
     {
+
+        public int Id { get; set; }
         public string AccountNumber { get; set; } = null!;
 
         public string Name { get; set; } = null!;

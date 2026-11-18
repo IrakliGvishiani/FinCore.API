@@ -53,7 +53,7 @@ namespace FinCore.Application.Services
         {
             Id = t.Id,
             FromAccountNumber = fromNumber,
-            ToAccountNumber = toNumber,
+            ToAccountNumber = MaskAccountNumber(toNumber),
             Amount = t.Amount,
             Currency = t.Currency,
             Status = t.Status,
@@ -72,7 +72,7 @@ namespace FinCore.Application.Services
                 Id = t.Id,
                 Direction = outgoing ? TransferDirection.Outgoing : TransferDirection.Incoming,
                 MyAccountNumber = outgoing ? t.FromAccount.AccountNumber : t.ToAccount.AccountNumber,
-                CounterPartyAccountNumber = outgoing ? t.ToAccount.AccountNumber : t.FromAccount.AccountNumber,
+                CounterPartyAccountNumber = MaskAccountNumber(outgoing ? t.ToAccount.AccountNumber : t.FromAccount.AccountNumber),
                 Amount = t.Amount,
                 Currency = t.Currency,
                 Status = t.Status,
@@ -80,6 +80,8 @@ namespace FinCore.Application.Services
                 CreatedAt = t.CreatedAt
             };
         }
+
+        
         private async Task<TransferDto> ExecuteWithRetryAsync(
     string userId, string fromAccountNumber, int toAccountId,
     decimal amount, string idempotencyKey, string? description, CancellationToken ct)
@@ -213,13 +215,13 @@ namespace FinCore.Application.Services
 
 
         private async Task<TransferDto> TryExecuteAsync(
-    string userId,
-    string fromAccountNumber,
-    int toAccountId,
-    decimal amount,
-    string idempotencyKey,
-    string? description = null,
-    CancellationToken cancellationToken = default)
+            string userId,
+            string fromAccountNumber,
+            int toAccountId,
+            decimal amount,
+            string idempotencyKey,
+            string? description = null,
+            CancellationToken cancellationToken = default)
         {
 
 

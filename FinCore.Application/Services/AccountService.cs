@@ -219,11 +219,11 @@ namespace FinCore.Application.Services
                     var customerEntry = existing.Entries.SingleOrDefault(
                         x => x.BankAccountId == account.Id  
                         &&
-                        x.Type == EntryType.Debit
+                        x.Type == EntryType.Credit
                         );
 
                     var cashEntry = existing.Entries.SingleOrDefault(
-                        x => x.BankAccountId == account.Id
+                        x => x.BankAccountId == null
                         &&
                         x.Type == EntryType.Debit
                         );

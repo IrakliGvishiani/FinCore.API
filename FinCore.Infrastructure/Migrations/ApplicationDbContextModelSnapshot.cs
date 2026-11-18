@@ -303,50 +303,6 @@ namespace FinCore.Infrastructure.Migrations
                     b.ToTable("CurrencyConversions");
                 });
 
-            modelBuilder.Entity("FinCore.Domain.Entities.CurrencyExchangeRate", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("EffectiveAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("ExpiresAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("FromCurrency")
-                        .IsRequired()
-                        .HasMaxLength(3)
-                        .HasColumnType("nvarchar(3)");
-
-                    b.Property<decimal>("Rate")
-                        .HasPrecision(18, 8)
-                        .HasColumnType("decimal(18,8)");
-
-                    b.Property<string>("ToCurrency")
-                        .IsRequired()
-                        .HasMaxLength(3)
-                        .HasColumnType("nvarchar(3)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("FromCurrency", "ToCurrency", "EffectiveAt")
-                        .IsUnique();
-
-                    b.ToTable("CurrencyExchangeRates", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_CurrencyExchangeRates_DifferentCurrencies", "[FromCurrency] <> [ToCurrency]");
-
-                            t.HasCheckConstraint("CK_CurrencyExchangeRates_Rate_Positive", "[Rate] > 0");
-                        });
-                });
-
             modelBuilder.Entity("FinCore.Domain.Entities.LedgerAccount", b =>
                 {
                     b.Property<int>("Id")

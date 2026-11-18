@@ -1,6 +1,7 @@
 ﻿using FinCore.Application.Contracts.Services;
 using FinCore.Application.Exceptions;
 using FinCore.Application.Models.SavedRecipientDtos;
+using FinCore.Domain.Constants;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -9,7 +10,7 @@ namespace FinCore.Controllers
 {
     [Route("api/recipient")]
     [ApiController]
-    [Authorize(Roles = "Customer")]
+    [Authorize(Roles = Roles.Customer)]
     public class SavedRecipientController : ControllerBase
     {
        private readonly ISavedRecipientService _savedRecipientService;

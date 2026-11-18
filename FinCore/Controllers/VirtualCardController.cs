@@ -1,6 +1,7 @@
 ﻿using FinCore.Application.Contracts.Services;
 using FinCore.Application.Exceptions;
 using FinCore.Application.Models.VirtualCardDtos;
+using FinCore.Domain.Constants;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -9,7 +10,7 @@ namespace FinCore.Controllers
 {
     [Route("api/card")]
     [ApiController]
-    [Authorize(Roles = "Customer")]
+    [Authorize(Roles = Roles.Customer)]
     public class VirtualCardController : ControllerBase
     {
         private readonly IVirtualCardService _cardService;
@@ -104,3 +105,4 @@ namespace FinCore.Controllers
 
     }
 }
+
