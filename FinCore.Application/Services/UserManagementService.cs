@@ -19,16 +19,19 @@ namespace FinCore.Application.Services
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IAuditService _audit;
         private readonly IUnitOfWork _uow;
+        private readonly IUserBanCache _banCache;
 
         public UserManagementService(
             UserManager<ApplicationUser> userManager,
             IAuditService auditService,
-            IUnitOfWork unitOfWork
+            IUnitOfWork unitOfWork,
+            IUserBanCache banCache
             )
         {
             _userManager = userManager;
             _audit = auditService;
             _uow = unitOfWork;
+            _banCache = banCache;
         }
 
         public async Task<UserDetailsDto> GetUserByIdAsync(string userId, CancellationToken ct = default)
@@ -58,6 +61,7 @@ namespace FinCore.Application.Services
                 ProfilePhotoUrl = user.ProfilePhotoUrl,
                 CreatedAt = user.CreatedAt,
                 Roles = roles,
+                IsBanned = user.IsAdminLocked,
 
                 BankAccounts = user.BankAccounts
                 .Select(account => new UserBankAccountDto
@@ -123,15 +127,18 @@ namespace FinCore.Application.Services
                     PhoneNumber = user.PhoneNumber,
                     ProfilePhotoUrl = user.ProfilePhotoUrl,
                     CreatedAt = user.CreatedAt,
-                    Roles = roles
+                    Roles = roles,
+                    IsBanned = user.IsAdminLocked
                 });
             }
 
             return (items, totalCount);
         }
 
-        public async Task LockUserAsync(string userId, CancellationToken ct = default)
+        public async Task LockUserAsync(string userId, string adminId, CancellationToken ct = default)
         {
+            ArgumentException.ThrowIfNullOrWhiteSpace(adminId);
+
             var user = await _userManager.FindByIdAsync(userId);
 
             if (user == null)
@@ -156,12 +163,17 @@ namespace FinCore.Application.Services
             user.IsAdminLocked = true;
             await _uow.SaveChangesAsync(ct);
 
-            await _audit.LogAsync(userId,AuditActions.UserLocked,AuditEntities.User,
-                userId,$"User {user.FirstName} {user.LastName} was banned by administrator");
+            // Rejects the user's still-valid access tokens (checked in JwtBearer OnTokenValidated).
+            await _banCache.MarkBannedAsync(user.Id);
+
+            await _audit.LogAsync(adminId,AuditActions.UserLocked,AuditEntities.User,
+                user.Id,$"User {user.FirstName} {user.LastName} was banned by administrator");
         }
 
-        public async Task UnlockUserAsync(string userId, CancellationToken ct = default)
+        public async Task UnlockUserAsync(string userId, string adminId, CancellationToken ct = default)
         {
+            ArgumentException.ThrowIfNullOrWhiteSpace(adminId);
+
             var user = await _userManager.FindByIdAsync(userId);
 
             if (user == null)
@@ -174,8 +186,11 @@ namespace FinCore.Application.Services
 
             user.IsAdminLocked = false;
             await _uow.SaveChangesAsync(ct);
-            await _audit.LogAsync(userId,AuditActions.UserUnlocked,AuditEntities.User,
-                userId,"user got unbanned by administrator");
+
+            await _banCache.ClearAsync(user.Id);
+
+            await _audit.LogAsync(adminId,AuditActions.UserUnlocked,AuditEntities.User,
+                user.Id,$"User {user.FirstName} {user.LastName} was unbanned by administrator");
         }
     }
 }

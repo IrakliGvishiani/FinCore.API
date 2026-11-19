@@ -24,6 +24,16 @@ namespace FinCore.Application.Services
             await _database.KeyDeleteAsync(key);
         }
 
+        public async Task<string?> GetAndRemoveAsync(string key)
+        {
+            return await _database.StringGetDeleteAsync(key);
+        }
+
+        public async Task<bool> ExistsAsync(string key)
+        {
+            return await _database.KeyExistsAsync(key);
+        }
+
 
         public async Task SetAsync(string key, string value, TimeSpan expiry)
         {

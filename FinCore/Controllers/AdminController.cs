@@ -4,6 +4,7 @@ using FinCore.Application.Models.Audit;
 using FinCore.Domain.Constants;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace FinCore.Controllers
 {
@@ -30,6 +31,11 @@ namespace FinCore.Controllers
             _userManagementService = userManagementService;
         }
 
+        // "sub" from the JWT, mapped to NameIdentifier by the default inbound claim mapping.
+        private string GetAdminId() =>
+            User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? throw new UnauthorizedAccessException("User ID not found.");
+
         [HttpGet("actions")]
         public IActionResult GetActions()
         => this.ToActionResult(_commonResponse.Success(AuditActions.All));
@@ -52,7 +58,7 @@ namespace FinCore.Controllers
         public async Task<IActionResult> FreezeAccount(string accountNumber, CancellationToken ct)
         {
 
-            await _accountService.FreezeAccountAsync(accountNumber, ct);
+            await _accountService.FreezeAccountAsync(accountNumber, GetAdminId(), ct);
 
             return this.ToActionResult(_commonResponse.NoContent());
         }
@@ -63,7 +69,7 @@ namespace FinCore.Controllers
         public async Task<IActionResult> UnfreezeAccount(string accountNumber, CancellationToken ct)
         {
 
-            await _accountService.UnfreezeAccountAsync(accountNumber, ct);
+            await _accountService.UnfreezeAccountAsync(accountNumber, GetAdminId(), ct);
 
             return this.ToActionResult(_commonResponse.NoContent());
         }
@@ -109,7 +115,7 @@ namespace FinCore.Controllers
             CancellationToken ct = default
             )
         {
-            await _userManagementService.LockUserAsync(userId,ct);
+            await _userManagementService.LockUserAsync(userId, GetAdminId(), ct);
 
             return this.ToActionResult(_commonResponse.NoContent());
         }
@@ -117,7 +123,7 @@ namespace FinCore.Controllers
         [HttpPatch("users/{userId}/unban")]
         public async Task<IActionResult> UnbanUser(string userId,CancellationToken ct = default)
         {
-            await _userManagementService.UnlockUserAsync(userId,ct);
+            await _userManagementService.UnlockUserAsync(userId, GetAdminId(), ct);
 
             return this.ToActionResult(_commonResponse.NoContent());
         }

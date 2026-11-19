@@ -12,6 +12,11 @@ namespace FinCore.Application.Contracts.Services
 
         Task RemoveAsync(string key);
 
+        /// <summary>Atomically reads and deletes a key (Redis GETDEL). Returns null if the key did not exist.</summary>
+        Task<string?> GetAndRemoveAsync(string key);
+
+        Task<bool> ExistsAsync(string key);
+
         //Task<bool> TryAcquireConfirmationResendAsync(string userId);
 
         Task<bool> TryAcquireRateLimitAsync(

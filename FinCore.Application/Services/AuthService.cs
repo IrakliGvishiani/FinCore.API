@@ -69,16 +69,20 @@ namespace FinCore.Application.Services
         }
 
 
-        public async Task<string> RegisterAdminAsync(UserRegistrationDto model)
+        public async Task<string> RegisterAdminAsync(UserRegistrationDto model, string actingAdminId)
         {
-            var user = await RegisterAsync(model, _adminRole);
+            ArgumentException.ThrowIfNullOrWhiteSpace(actingAdminId);
+
+            var user = await RegisterAsync(model, _adminRole, actingAdminId);
             await SendConfirmationCodeAsync(user);
             return user.Id;
         }
 
-        public async Task<string> RegisterManagerAsync(UserRegistrationDto model)
+        public async Task<string> RegisterManagerAsync(UserRegistrationDto model, string actingAdminId)
         {
-            var user = await RegisterAsync(model,_managerRole);
+            ArgumentException.ThrowIfNullOrWhiteSpace(actingAdminId);
+
+            var user = await RegisterAsync(model, _managerRole, actingAdminId);
             await SendConfirmationCodeAsync(user);
             return user.Id;
         }
@@ -264,7 +268,9 @@ namespace FinCore.Application.Services
         """);
         }
 
-        private async Task<ApplicationUser> RegisterAsync(UserRegistrationDto model, string role)
+        /// <param name="actingAdminId">Id of the admin creating the user; null for self-registration.</param>
+        private async Task<ApplicationUser> RegisterAsync(UserRegistrationDto model, string role,
+            string? actingAdminId = null)
         {
             try
             {
@@ -314,8 +320,16 @@ namespace FinCore.Application.Services
                     throw new BadRequestException(
                         roleResult.Errors.First().Description);
                 }
-                await _audit.LogAsync(user.Id,AuditActions.Registered,AuditEntities.User,
-                    user.Id,"user registered successfully");
+                if (actingAdminId is null)
+                {
+                    await _audit.LogAsync(user.Id, AuditActions.Registered, AuditEntities.User,
+                        user.Id, "user registered successfully");
+                }
+                else
+                {
+                    await _audit.LogAsync(actingAdminId, AuditActions.Registered, AuditEntities.User,
+                        user.Id, $"{role} account created by administrator");
+                }
 
                 await _unitOfWork.CommitTransactionAsync();
 
@@ -330,20 +344,35 @@ namespace FinCore.Application.Services
 
         public async Task<LoginResponseDto> RefreshTokenAsync(string token)
         {
-            var userId = await _redisService.GetAsync(
-       $"refresh-token:{token}");
+            const string invalidRefreshToken = "Invalid or expired refresh token.";
+
+            if (string.IsNullOrWhiteSpace(token))
+                throw new BadRequestException(invalidRefreshToken);
+
+            // Atomic GETDEL: the token is consumed exactly once, even if the checks below
+            // reject the request, and two parallel refreshes cannot both succeed.
+            var userId = await _redisService.GetAndRemoveAsync(
+                $"refresh-token:{token}");
 
             if (string.IsNullOrEmpty(userId))
-                throw new BadRequestException("Invalid or expired refresh token.");
+                throw new BadRequestException(invalidRefreshToken);
 
             var user = await _userManager.FindByIdAsync(userId);
 
             if (user == null)
-                throw new NotFoundException("User not found.");
+                throw new BadRequestException(invalidRefreshToken);
 
+            if (user.IsAdminLocked)
+            {
+                await _audit.LogAsync(
+                    user.Id,
+                    AuditActions.LoginFailed,
+                    AuditEntities.User,
+                    user.Id,
+                    "token refresh attempted while account was administratively banned");
 
-            await _redisService.RemoveAsync(
-                $"refresh-token:{token}");
+                throw new BadRequestException(invalidRefreshToken);
+            }
 
             var roles = await _userManager.GetRolesAsync(user);
 

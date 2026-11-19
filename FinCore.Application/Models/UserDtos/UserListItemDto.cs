@@ -23,5 +23,8 @@ namespace FinCore.Application.Models.UserDtos
         public DateTime CreatedAt { get; set; }
 
         public IList<string> Roles { get; set; } = new List<string>();
+
+        /// <summary>Administrative ban (ApplicationUser.IsAdminLocked). Not set by failed-password lockouts.</summary>
+        public bool IsBanned { get; set; }
     }
 }

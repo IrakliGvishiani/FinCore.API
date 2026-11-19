@@ -65,8 +65,10 @@ namespace FinCore.Application.Services
 
 
 
-        public async Task FreezeAccountAsync(string accountNumber, CancellationToken ct = default)
+        public async Task FreezeAccountAsync(string accountNumber, string adminId, CancellationToken ct = default)
         {
+            ArgumentException.ThrowIfNullOrWhiteSpace(adminId);
+
             var account = await _accounts.GetAsync(
                 filter: x => x.AccountNumber == accountNumber,
                 cancellationToken: ct
@@ -74,9 +76,9 @@ namespace FinCore.Application.Services
 
             account.Freeze();
 
-            await _audit.RecordAsync(null,AuditActions.AccountFrozen,AuditEntities.BankAccount,
+            await _audit.RecordAsync(adminId,AuditActions.AccountFrozen,AuditEntities.BankAccount,
                 account.AccountNumber,
-                null,
+                $"ownerUserId={account.UserId}",
                 ct);
 
             await _unitOfWork.SaveChangesAsync();
@@ -167,8 +169,10 @@ namespace FinCore.Application.Services
             throw new ConcurrencyConflictException("Could not generate a unique account number. Please try again.");
         }
 
-        public async Task UnfreezeAccountAsync(string accountNumber, CancellationToken ct = default)
+        public async Task UnfreezeAccountAsync(string accountNumber, string adminId, CancellationToken ct = default)
         {
+            ArgumentException.ThrowIfNullOrWhiteSpace(adminId);
+
             var account = await _accounts.GetAsync(
                 filter: x => x.AccountNumber == accountNumber,
                 cancellationToken: ct
@@ -176,9 +180,9 @@ namespace FinCore.Application.Services
 
             account.Unfreeze();
 
-            await _audit.RecordAsync(null,AuditActions.AccountUnfrozen,AuditEntities.BankAccount,
+            await _audit.RecordAsync(adminId,AuditActions.AccountUnfrozen,AuditEntities.BankAccount,
                 account.AccountNumber,
-                null,
+                $"ownerUserId={account.UserId}",
                 ct);
 
             await _unitOfWork.SaveChangesAsync();

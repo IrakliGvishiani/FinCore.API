@@ -5,6 +5,7 @@ using FinCore.Domain.Constants;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Filters;
+using System.Security.Claims;
 using static FinCore.Examples;
 
 namespace FinCore.Controllers
@@ -34,16 +35,20 @@ namespace FinCore.Controllers
         [HttpPost("register-admin")]
         public async Task<IActionResult> RegisterAdmin([FromBody] UserRegistrationDto request)
         {
-            var admin = await _authService.RegisterAdminAsync(request);
+            var admin = await _authService.RegisterAdminAsync(request, GetActingAdminId());
             return this.ToActionResult(_commonResponse.Created(admin));
         }
         [Authorize(Roles = Roles.Admin)]
         [HttpPost("register-manager")]
         public async Task<IActionResult> RegisterManager([FromBody] UserRegistrationDto request)
         {
-            var manager = await _authService.RegisterManagerAsync(request);
+            var manager = await _authService.RegisterManagerAsync(request, GetActingAdminId());
             return this.ToActionResult(_commonResponse.Created(manager));
         }
+
+        private string GetActingAdminId() =>
+            User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? throw new UnauthorizedAccessException("User ID not found.");
 
         [HttpPost("confirm-email")]
         public async Task<IActionResult> ConfirmEmail(ConfirmEmailDto model)

@@ -9,9 +9,9 @@ namespace FinCore.Application.Contracts.Services
     {
         Task<string> RegisterUserAsync(UserRegistrationDto model);
 
-        Task<string> RegisterAdminAsync(UserRegistrationDto model);
+        Task<string> RegisterAdminAsync(UserRegistrationDto model, string actingAdminId);
 
-        Task<string> RegisterManagerAsync(UserRegistrationDto model);
+        Task<string> RegisterManagerAsync(UserRegistrationDto model, string actingAdminId);
 
         Task<LoginResponseDto> LoginAsync(LoginRequestDto model);
 

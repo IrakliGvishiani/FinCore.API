@@ -43,6 +43,7 @@ services:
       - AdminSeed__LastName=${ADMIN_LAST_NAME}
 
       - AppSettings__BaseUrl=${APP_BASE_URL}
+      - AppSettings__FrontendBaseUrl=${FRONTEND_BASE_URL}
 
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
@@ -82,17 +83,17 @@ services:
     volumes:
       - fincore_redis_data:/data
 
-  # Angular-ის კლიენტი, როცა მზად იქნება:
-  # fincore.client:
-  #   build:
-  #     context: ../fincore-client
-  #     dockerfile: Dockerfile
-  #   container_name: fincore-client
-  #   depends_on:
-  #     - fincore.api
-  #   ports:
-  #     - "127.0.0.1:8091:80"
-  #   restart: unless-stopped
+ 
+  fincore.client:
+    build:
+      context: ../fincore-client
+      dockerfile: Dockerfile
+    container_name: fincore-client
+    depends_on:
+      - fincore.api
+    ports:
+      - "127.0.0.1:8091:80"
+    restart: unless-stopped
 
 volumes:
   fincore_sqlserver_data:

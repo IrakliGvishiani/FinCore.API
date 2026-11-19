@@ -21,9 +21,9 @@ namespace FinCore.Application.Contracts.Services
 
         Task CloseAccountAsync(string userId, string accountNumber,CancellationToken ct =default);
 
-        Task FreezeAccountAsync(string accountNumber, CancellationToken ct = default);
+        Task FreezeAccountAsync(string accountNumber, string adminId, CancellationToken ct = default);
 
-        Task UnfreezeAccountAsync(string accountNumber,CancellationToken ct =default);
+        Task UnfreezeAccountAsync(string accountNumber, string adminId, CancellationToken ct = default);
 
         Task<AccountForGettingDto> DepositAsync(string userId,
             string accountNumber,decimal amount,

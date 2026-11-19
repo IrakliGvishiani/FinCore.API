@@ -16,12 +16,14 @@ using FinCore.Others;
 using Mapster;
 using MapsterMapper;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using StackExchange.Redis;
 using Swashbuckle.AspNetCore.Filters;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json.Serialization;
 
@@ -83,6 +85,7 @@ namespace FinCore
             builder.Services.AddScoped<IAccountStatementService,AccountStatementService>();
             builder.Services.AddScoped<IAuditService, AuditService>();
             builder.Services.AddScoped<IUserManagementService, UserManagementService>();
+            builder.Services.AddScoped<IUserBanCache, UserBanCache>();
             builder.Services.AddScoped<IManagerService, ManagerService>();
             builder.Services.Configure<SuspiciousActivityOptions>(
             builder.Configuration.GetSection(SuspiciousActivityOptions.SectionName));
@@ -204,6 +207,25 @@ namespace FinCore
                     ValidAudience = audience,
                     ClockSkew = TimeSpan.Zero
                 };
+
+                options.Events = new JwtBearerEvents
+                {
+                    // Rejects still-valid access tokens of users banned after the token was issued.
+                    // Fails open if Redis is unavailable (see UserBanCache.IsBannedAsync).
+                    OnTokenValidated = async context =>
+                    {
+                        var userId = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                        if (string.IsNullOrEmpty(userId))
+                            return;
+
+                        var banCache = context.HttpContext.RequestServices
+                            .GetRequiredService<IUserBanCache>();
+
+                        if (await banCache.IsBannedAsync(userId))
+                            context.Fail("User is banned.");
+                    }
+                };
             });
 
             // CLOUDINARY
@@ -216,12 +238,22 @@ namespace FinCore
                 Api = { Secure = true }
             };
 
+
+            builder.Services.Configure<ForwardedHeadersOptions>(o =>
+            {
+                o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+                o.KnownNetworks.Clear();
+                o.KnownProxies.Clear();
+            });
+
             builder.Services.AddSingleton(cloudinary);
 
 
             var app = builder.Build();
             app.MapGet("/health", () => Results.Ok("Healthy"));
+
             // Configure the HTTP request pipeline.
+            app.UseForwardedHeaders();
             app.UseMiddleware<ErrorHandlingMiddleware>();
             app.UseSwagger();
             app.UseSwaggerUI();
