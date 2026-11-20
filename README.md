@@ -227,4 +227,4 @@ Detailed notes for the client container and the reverse proxy are in the `fincor
 
 ## Author
 
-Graduation project by **<Irakli Gvishiani>**.
+Graduation project by Irakli Gvishiani.
