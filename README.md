@@ -75,7 +75,7 @@ The system is documented with the C4 model (levels 1 to 3). The diagrams are gen
 
 ### Level 3: API components
 
-![C4 level 3: API components](docs/images/c4-level3-componentsComponents-dark)
+![C4 level 3: API components](docs/images/c4-level3-componentsComponents-dark.png)
 
 
 Key design decisions:
