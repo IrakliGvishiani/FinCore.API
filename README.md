@@ -62,16 +62,21 @@ This repository contains the **backend** (ASP.NET Core Web API). The Angular cli
 
 ## Architecture
 
-The solution follows Clean Architecture. Dependencies point inwards: the Domain layer knows nothing about the other layers.
 
-```
-FinCore.sln
-├── FinCore/                  API layer: controllers, middleware, Program.cs, configuration
-├── FinCore.Application/      Use cases: services, DTOs, interfaces, application exceptions
-├── FinCore.Domain/           Entities, enums, domain rules and domain exceptions
-├── FinCore.Infrastructure/   EF Core DbContext, migrations, repositories, external APIs
-└── FinCore.UnitTests/        Unit tests
-```
+The system is documented with the C4 model (levels 1 to 3). The diagrams are generated from [docs/workspace.dsl](docs/workspace.dsl) with Structurizr; open it in https://playground.structurizr.com to view or edit them.
+
+### Level 1: System context
+
+![C4 level 1: system context](docs/images/c4-level1-contextSystemContext-dark.png)
+
+### Level 2: Containers
+
+![C4 level 2: containers](docs/images/c4-level2-containersContainers-dark.png)
+
+### Level 3: API components
+
+![C4 level 3: API components](docs/images/c4-level3-componentsComponents-dark)
+
 
 Key design decisions:
 
