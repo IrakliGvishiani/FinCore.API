@@ -14,6 +14,13 @@ namespace FinCore.Application.Contracts.Services
             CancellationToken ct = default
             );
 
+        /// <summary>Prices a payment for every account the card may use. Read-only: never writes, never opens a transaction.</summary>
+        Task<PaymentQuoteDto> QuoteAsync(
+            string userId,
+            PaymentQuoteRequestDto model,
+            CancellationToken ct = default
+            );
+
         Task<PaymentDto> GetByIdAsync(
             string userId,
             int paymentId,

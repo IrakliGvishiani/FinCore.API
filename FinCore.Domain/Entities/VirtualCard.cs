@@ -135,24 +135,6 @@ namespace FinCore.Domain.Entities
             TransactionLimit = transactionLimit;
         }
 
-        public PaymentDeclineReason? Authorize(
-          BankAccount account, decimal amount,CurrencyCode paymentCurrency, decimal spentToday, DateTime utcNow)
-        {
-            if (account.Id != BankAccountId)
-                throw new DomainException("Account does not belong to this card.");
-            if (amount <= 0 || decimal.Round(amount, 2) != amount)
-                throw new DomainException("Amount must be positive with at most 2 decimals.");
-
-            if (Status != VirtualCardStatus.Active) return PaymentDeclineReason.CardNotActive;
-            if (IsExpired(utcNow)) return PaymentDeclineReason.CardExpired;
-            if (account.Currency != paymentCurrency) return PaymentDeclineReason.CurrencyMismatch;
-            if (account.Status != AccountStatus.Active) return PaymentDeclineReason.AccountNotActive;
-            if (amount > TransactionLimit) return PaymentDeclineReason.TransactionLimitExceeded;
-            if (spentToday + amount > DailyLimit) return PaymentDeclineReason.DailyLimitExceeded;
-            if (amount > account.Balance) return PaymentDeclineReason.InsufficientFunds;
-            return null;
-        }
-
         /// <summary>
         /// Status checks that need no exchange rate, in this fixed order:
         /// CardNotActive, CardExpired, SourceAccountNotAllowed, AutoConversionNotAllowed, AccountNotActive.
