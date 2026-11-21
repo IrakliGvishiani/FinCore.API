@@ -1,5 +1,6 @@
 ﻿using FinCore.Domain.DomainExceptions;
 using FinCore.Domain.Enums;
+using FinCore.Domain.Services;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -47,10 +48,7 @@ namespace FinCore.Domain.Entities
             if (feeRate < 0 || feeRate >= 1)
                 throw new DomainException("Invalid fee rate.");
 
-            var feeAmount = decimal.Round(fromAmount * feeRate, 2, MidpointRounding.AwayFromZero);
-            var netAmount = fromAmount - feeAmount;
-
-            var toAmount = decimal.Round(netAmount * rate, 2, MidpointRounding.ToZero);
+            var (feeAmount, _, toAmount) = FxMath.Forward(fromAmount, rate, feeRate);
             if (toAmount <= 0)
                 throw new DomainException("Amount is too small to convert.");
 

@@ -18,34 +18,31 @@ namespace FinCore.Application.Services
 {
     public class ConversionService : IConversionService
     {
-        private readonly IExchangeRateProvider _rates;
+        private readonly IFxPricingService _fx;
         private readonly IUnitOfWork _uow;
         private readonly IRepositoryBase<CurrencyConversion> _conversions;
         private readonly IRepositoryBase<BankAccount> _accounts;
         private readonly IRepositoryBase<LedgerTransaction> _ledgerTransactions;
         private readonly IRepositoryBase<LedgerAccount> _ledgerAccounts;
-        private readonly IOptions<ConversionOptions> _options;
         private readonly IAuditService _audit;
 
 
         public ConversionService(
-            IExchangeRateProvider exchangeRateProvider,
+            IFxPricingService fxPricingService,
             IUnitOfWork unitOfWork,
             IRepositoryBase<CurrencyConversion> conversions,
             IRepositoryBase<BankAccount> accounts,
             IRepositoryBase<LedgerTransaction> ledgerTransactions,
             IRepositoryBase<LedgerAccount> ledgerAccounts,
-            IOptions<ConversionOptions> options,
             IAuditService auditService
             )
         {
-            _rates = exchangeRateProvider;
+            _fx = fxPricingService;
             _uow = unitOfWork;
             _conversions = conversions;
             _accounts = accounts;
             _ledgerTransactions = ledgerTransactions;
             _ledgerAccounts = ledgerAccounts;
-            _options = options;
             _audit = auditService;
         }
 
@@ -87,10 +84,10 @@ namespace FinCore.Application.Services
                 ?? throw new NotFoundException("Destination account not found.");
 
 
-            var rate = await _rates.GetRateAsync(from.Currency, to.Currency, ct);
+            var rate = await _fx.GetRateAsync(from.Currency, to.Currency, ct);
 
             var preview = CurrencyConversion.Create(
-             userId, from, to, amount, rate.Rate, rate.RateDate,_options.Value.FeeRate, "quote");
+             userId, from, to, amount, rate.Rate, rate.RateDate,_fx.FeeRate, "quote");
 
             return ToQuoteDto(preview, fromNo, toNo);
         }
@@ -152,7 +149,7 @@ namespace FinCore.Application.Services
                 a => a.AccountNumber == toNo && a.UserId == userId, tracking: false, cancellationToken: ct)
                 ?? throw new NotFoundException("Destination account not found.");
 
-            var rate = await _rates.GetRateAsync(fromProbe.Currency, toProbe.Currency, ct);
+            var rate = await _fx.GetRateAsync(fromProbe.Currency, toProbe.Currency, ct);
 
             if (expectedRate is not null && expectedRate != rate.Rate)
                 throw new ConflictException("The exchange rate has changed. Please confirm the new rate.");
@@ -195,7 +192,7 @@ namespace FinCore.Application.Services
                     amount,
                     rate.Rate,
                     rate.RateDate,
-                    _options.Value.FeeRate,
+                    _fx.FeeRate,
                     key
                     );
 

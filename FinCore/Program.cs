@@ -105,6 +105,7 @@ namespace FinCore
 
             builder.Services.Configure<ConversionOptions>(
             builder.Configuration.GetSection(ConversionOptions.SectionName));
+            builder.Services.AddScoped<IFxPricingService, FxPricingService>();
 
             builder.Services.AddHttpContextAccessor();
             builder.Services.AddScoped<IRequestContext, HttpRequestContext>();
