@@ -33,10 +33,26 @@ namespace FinCore.Domain.Entities
 
         public DateTime CreatedAt { get; private set; }
 
+        /// <summary>
+        /// When false (default) the card pays only from its main account and only in that account's currency.
+        /// When true a payment may be funded from any Active account of the card owner, with FX conversion.
+        /// </summary>
+        public bool AllowAutoConversion { get; private set; }
+
+        /// <summary>Set on every payment authorization so the row (and its RowVersion) changes.</summary>
+        public DateTime? LastAuthorizedAt { get; private set; }
+
+        /// <summary>
+        /// Optimistic concurrency token. Every authorization updates the card row, so two concurrent
+        /// payments on one card cannot both commit against the same daily-limit snapshot.
+        /// </summary>
+        public byte[] RowVersion { get; private set; } = null!;
+
 
         public static VirtualCard Create(
             string userId, BankAccount account,string name,string last4,
-            decimal dailyLimit,decimal transactionLimit,DateTime utcNow
+            decimal dailyLimit,decimal transactionLimit,DateTime utcNow,
+            bool allowAutoConversion = false
             )
         {
             if (account.UserId != userId)
@@ -71,8 +87,17 @@ namespace FinCore.Domain.Entities
                 Status = VirtualCardStatus.Active,
                 DailyLimit = dailyLimit,
                 TransactionLimit = transactionLimit,
-                CreatedAt = utcNow
+                CreatedAt = utcNow,
+                AllowAutoConversion = allowAutoConversion
             };
+        }
+
+        public void SetAutoConversion(bool enabled)
+        {
+            if (Status == VirtualCardStatus.Closed)
+                throw new DomainException("Closed cards cannot be changed.");
+
+            AllowAutoConversion = enabled;
         }
 
         public bool IsExpired(DateTime utcNow)
@@ -127,6 +152,51 @@ namespace FinCore.Domain.Entities
             if (amount > account.Balance) return PaymentDeclineReason.InsufficientFunds;
             return null;
         }
+
+        /// <summary>
+        /// Status checks that need no exchange rate, in this fixed order:
+        /// CardNotActive, CardExpired, SourceAccountNotAllowed, AutoConversionNotAllowed, AccountNotActive.
+        /// </summary>
+        /// <param name="source">The account that funds the payment (must belong to the card owner).</param>
+        /// <param name="merchantCurrency">Currency the merchant asks for.</param>
+        /// <param name="mainAccountCurrency">Currency of the card's main account (<see cref="BankAccountId"/>).</param>
+        public PaymentDeclineReason? AuthorizeSource(
+            BankAccount source, CurrencyCode merchantCurrency, CurrencyCode mainAccountCurrency, DateTime utcNow)
+        {
+            if (source is null)
+                throw new DomainException("Source account is required.");
+            if (source.UserId != UserId)
+                throw new DomainException("Source account does not belong to the card owner.");
+
+            if (Status != VirtualCardStatus.Active) return PaymentDeclineReason.CardNotActive;
+            if (IsExpired(utcNow)) return PaymentDeclineReason.CardExpired;
+            if (!AllowAutoConversion && source.Id != BankAccountId) return PaymentDeclineReason.SourceAccountNotAllowed;
+            if (!AllowAutoConversion && merchantCurrency != mainAccountCurrency) return PaymentDeclineReason.AutoConversionNotAllowed;
+            if (source.Status != AccountStatus.Active) return PaymentDeclineReason.AccountNotActive;
+            return null;
+        }
+
+        /// <summary>
+        /// Amount checks, after pricing, in this fixed order:
+        /// TransactionLimitExceeded, DailyLimitExceeded (both on amounts in the main account's currency),
+        /// InsufficientFunds (on the charged amount in the source account's currency).
+        /// </summary>
+        public PaymentDeclineReason? AuthorizeAmounts(
+            BankAccount source, decimal limitAmount, decimal chargedAmount, decimal spentToday)
+        {
+            if (limitAmount <= 0 || decimal.Round(limitAmount, 2) != limitAmount)
+                throw new DomainException("Limit amount must be positive with at most 2 decimals.");
+            if (chargedAmount <= 0 || decimal.Round(chargedAmount, 2) != chargedAmount)
+                throw new DomainException("Charged amount must be positive with at most 2 decimals.");
+
+            if (limitAmount > TransactionLimit) return PaymentDeclineReason.TransactionLimitExceeded;
+            if (spentToday + limitAmount > DailyLimit) return PaymentDeclineReason.DailyLimitExceeded;
+            if (chargedAmount > source.Balance) return PaymentDeclineReason.InsufficientFunds;
+            return null;
+        }
+
+        /// <summary>Touches the card row so its RowVersion changes (see <see cref="RowVersion"/>).</summary>
+        public void RegisterAuthorization(DateTime utcNow) => LastAuthorizedAt = utcNow;
 
         private static void EnsureLimits(decimal daily,decimal perTransaction)
         {

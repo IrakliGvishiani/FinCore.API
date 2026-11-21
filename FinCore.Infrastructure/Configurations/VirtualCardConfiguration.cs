@@ -50,6 +50,15 @@ namespace FinCore.Infrastructure.Configurations
             builder.Property(x => x.CreatedAt)
                 .IsRequired();
 
+            builder.Property(x => x.AllowAutoConversion)
+                .IsRequired()
+                .HasDefaultValue(false);
+
+            builder.Property(x => x.LastAuthorizedAt);
+
+            builder.Property(x => x.RowVersion)
+                .IsRowVersion();
+
             builder.HasOne(x => x.BankAccount)
                 .WithMany()
                 .HasForeignKey(x => x.BankAccountId)

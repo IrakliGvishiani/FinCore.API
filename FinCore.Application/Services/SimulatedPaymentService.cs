@@ -113,6 +113,7 @@ namespace FinCore.Application.Services
 
                 var payment = SimulatedPayment.Create(
                     card,
+                    account,
                     account.Currency,
                     model.Amount,
                     model.Merchant,
@@ -121,34 +122,19 @@ namespace FinCore.Application.Services
                     now
                     );
 
+                // Same-currency pricing (the request has no currency yet); replaced in phase 3.
+                payment.ApplyPricing(model.Amount, 1m, 0m, model.Amount, null);
+
                 if(declineReason is null)
                 {
-                    account.Debit(model.Amount);
-
                     var settlementAccount = await GetLedgerAccountAsync(
                         LedgerAccountCodes.CardSettlement(account.Currency),
                         account.Currency,
                         ct
                         );
 
-                    var transaction = LedgerTransaction.Create(
-                        payment.Reference,
-                        account.Currency,
-
-                        new[]
-                        {
-                            LedgerLine.ForCustomer(account.Id,EntryType.Debit,model.Amount),
-
-                            LedgerLine.ForSystem(settlementAccount.Id,EntryType.Credit,model.Amount)
-                        },
-                        LedgerTransactionType.CardPayment
-
-
-                        );
-
-                    payment.Complete();
-
-                    await _ledgerTransactions.AddAsync(transaction,ct);
+                    foreach (var transaction in payment.Settle(account, settlementAccount))
+                        await _ledgerTransactions.AddAsync(transaction,ct);
                 }
                 else
                 {
