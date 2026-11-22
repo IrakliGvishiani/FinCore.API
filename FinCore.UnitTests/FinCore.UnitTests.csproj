@@ -25,6 +25,7 @@
     <ProjectReference Include="..\FinCore.Application\FinCore.Application.csproj" />
     <ProjectReference Include="..\FinCore.Domain\FinCore.Domain.csproj" />
     <ProjectReference Include="..\FinCore.Infrastructure\FinCore.Infrastructure.csproj" />
+    <ProjectReference Include="..\FinCore\FinCore.csproj" />
   </ItemGroup>
 
 </Project>
