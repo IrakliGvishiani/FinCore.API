@@ -51,9 +51,37 @@ namespace FinCore.Infrastructure.Configurations
             builder.Property(x => x.CreatedAt)
                 .IsRequired();
 
+            builder.Property(x => x.ChargedCurrency)
+                .HasConversion<string>()
+                .HasMaxLength(3)
+                .IsRequired();
+
+            // Nullable: only set once the payment is priced (declines before pricing leave them null).
+            builder.Property(x => x.ChargedAmount)
+                .HasPrecision(18, 2);
+
+            builder.Property(x => x.ExchangeRate)
+                .HasPrecision(18, 8);
+
+            builder.Property(x => x.FeeAmount)
+                .HasPrecision(18, 2);
+
+            builder.Property(x => x.LimitAmount)
+                .HasPrecision(18, 2);
+
+            builder.Property(x => x.RateDate);
+
+            builder.Ignore(x => x.IsPriced);
+            builder.Ignore(x => x.IsConversion);
+
             builder.HasOne<VirtualCard>()
                 .WithMany()
                 .HasForeignKey(x => x.VirtualCardId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.HasOne<BankAccount>()
+                .WithMany()
+                .HasForeignKey(x => x.SourceBankAccountId)
                 .OnDelete(DeleteBehavior.Restrict);
 
             builder.HasIndex(x => x.Reference)

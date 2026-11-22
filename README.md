@@ -35,6 +35,9 @@ This repository contains the **backend** (ASP.NET Core Web API). The Angular cli
 - Create virtual cards with daily and per-transaction limits, freeze, unfreeze, close
 - The full card number is shown only once, at creation
 - Simulated card payments with stored declines (limit exceeded, insufficient funds, card not active, ...)
+- Pay in GEL, USD, EUR or GBP: with automatic conversion enabled on the card, a payment can be funded from any active account of the card owner, at the NBG rate with the same 0.5% fee as currency conversions
+- Payment quote for every usable account, with a recommended account and rate protection (the client sends the charged amount it was quoted)
+- Receipts show the merchant amount, the charged amount and account, the rate with its date and the fee when a conversion happened
 
 **Monitoring and security**
 - Manager panel: transfers, accounts, conversions and suspicious activity (review and resolve workflow)
@@ -104,6 +107,47 @@ All responses use a common envelope: `{ message, result, isSuccess, statusCode }
 | Saved recipients | `/api/recipient` | Customer |
 | Monitoring | `/api/manager` | Manager, Admin |
 | Administration | `/api/admin` | Admin |
+
+### Card payments and automatic currency conversion
+
+A card is linked to one **main account** and to its owner. Card limits (per transaction and daily) are in the main account's currency.
+
+- **Auto-conversion off** (default): the card pays only from its main account and only in that account's currency. A payment in another currency is declined (`AutoConversionNotAllowed`); another source account is declined (`SourceAccountNotAllowed`).
+- **Auto-conversion on**: a payment can be funded from any **Active** account of the card owner. If the source currency differs from the merchant currency, the amount is converted with the same NBG rate source and 0.5% fee as `/api/conversions`. The charge is the smallest amount (rounded **up** to the cent) whose conversion covers the merchant price, so the merchant is never under-paid. For limits the merchant amount is converted to the main account's currency at the mid rate without fee, rounded up.
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /api/payments` | Pay. Body: `virtualCardId`, `amount`, `merchant`, `description?`, `idempotencyKey`, and optionally `currency` (default: main account currency), `sourceAccountId` (default: main account), `expectedChargedAmount` (rate protection). The old body without the optional fields works as before. |
+| `POST /api/payments/quote` | Read-only. Body: `virtualCardId`, `amount`, `currency`. Returns, for every account the card may use, the charged amount, rate, fee and whether the balance is enough, plus the limit amount and a `recommendedAccountId`. |
+| `PATCH /api/card/{id}/auto-conversion` | Body `{ "enabled": true }`. Turns auto-conversion on or off (audited as `card.auto_conversion_changed`) and returns the card. |
+| `POST /api/card` | Accepts an optional `allowAutoConversion` (default `false`). |
+
+**Recommendation rule** (deterministic): a same-currency account with enough balance (main account first, then lowest id), else the main account if it has enough, else another account with enough balance ordered by currency code, then id.
+
+**Order of checks** for `POST /api/payments` (the first failing check decides):
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Request validation | `400`, nothing stored |
+| 2 | Card not found / not yours | `404`, nothing stored |
+| 3 | Idempotency key already used: same request returns the stored result (also a stored decline); different request | `200` replay / `409` |
+| 4 | Source account not found / not yours | `404`, nothing stored |
+| 5 | `CardNotActive` | stored decline |
+| 6 | `CardExpired` | stored decline |
+| 7 | `SourceAccountNotAllowed` | stored decline |
+| 8 | `AutoConversionNotAllowed` | stored decline |
+| 9 | `AccountNotActive` (source account) | stored decline |
+| 10 | NBG rates (only if a conversion or a limit conversion is needed) | `503`, nothing stored |
+| 11 | `expectedChargedAmount` given and different from the server's charge | `409`, nothing stored: re-quote |
+| 12 | `TransactionLimitExceeded` (limit amount, main account currency) | stored decline |
+| 13 | `DailyLimitExceeded` (today's completed limit amounts + this one) | stored decline |
+| 14 | `InsufficientFunds` (charged amount vs source balance) | stored decline |
+
+Declines at steps 5 to 9 are stored without pricing (`chargedAmount`, `exchangeRate`, `feeAmount`, `limitAmount` are `null`). `CurrencyMismatch` is a legacy reason that is no longer produced.
+
+**Ledger.** Every payment balances per currency. Without conversion: one `CardPayment` transaction (customer debit, card settlement credit). With conversion: `PAY-…-OUT` in the source currency (customer debit; credits to `FX-{source}` for the net amount and `FEE-{source}` for the fee) and `PAY-…-IN` in the merchant currency (debit `FX-{merchant}`, credit `CARD{merchant}`), both of type `CardPayment`.
+
+**Concurrency.** Every authorization updates the card row (`RowVersion`), so two concurrent payments on one card cannot both pass the daily limit. Conflicts, and a duplicate `(card, idempotencyKey)` insert, roll the attempt back and retry it (up to 3 attempts); a retry after a duplicate key returns the stored payment.
 
 ---
 
@@ -223,7 +267,9 @@ Detailed notes for the client container and the reverse proxy are in the `fincor
 
 ## Known limitations
 
-- Card payments are charged in the currency of the card's account; there is no automatic conversion for shop prices in another currency (the demo shop prices items in GEL).
+- Card payment conversion uses the NBG rate table, cached in memory for 30 minutes per API instance. Rate protection compares the exact charged amount, so a quote made just before the table refreshes (or on another instance) gets a `409` and the client must re-quote.
+- A card payment that needs a rate fetches it while its database transaction is open. Only reads have happened at that point, so no rows are locked, but one database connection is held for up to the 5-second NBG timeout.
+- A payment that needs no conversion but is in a currency other than the card's main account (for example USD from a USD account on a GEL card) still needs NBG for the limit check, and returns `503` while NBG is unavailable.
 - Date filters compare UTC days, so operations made between 00:00 and 04:00 in Georgia can fall on the previous day.
 - A banned user's already-issued access token is rejected through a short-lived ban cache; existing refresh tokens are blocked at refresh time rather than revoked individually.
 - Scheduled transfers and changing the password while logged in are not implemented (use forgot / reset password).

@@ -30,9 +30,14 @@ namespace FinCore.Controllers
         [Authorize]
         [HttpPost]
         public async Task<IActionResult> Pay(
-            [FromBody] CreatePaymentDto model,
+            [FromBody] CreatePaymentDto? model,
             CancellationToken ct)
         {
+            // No [ApiController] here (it would change the error format), so a missing or
+            // unparseable body (e.g. "currency": "JPY") arrives as null: answer 400 ourselves.
+            if (model is null || !ModelState.IsValid)
+                return this.ToActionResult(_commonResponse.BadRequest(InvalidBodyMessage()));
+
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
 
             var result = await _simulatedPaymentService.PayAsync(
@@ -41,6 +46,33 @@ namespace FinCore.Controllers
                 ct);
 
             return this.ToActionResult(_commonResponse.Success(result));
+        }
+
+        [HttpPost("quote")]
+        public async Task<IActionResult> Quote(
+            [FromBody] PaymentQuoteRequestDto? model,
+            CancellationToken ct)
+        {
+            if (model is null || !ModelState.IsValid)
+                return this.ToActionResult(_commonResponse.BadRequest(InvalidBodyMessage()));
+
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+
+            var result = await _simulatedPaymentService.QuoteAsync(userId, model, ct);
+
+            return this.ToActionResult(_commonResponse.Success(result));
+        }
+
+        private string InvalidBodyMessage()
+        {
+            var first = ModelState.Values
+                .SelectMany(v => v.Errors)
+                .Select(e => string.IsNullOrWhiteSpace(e.ErrorMessage) ? e.Exception?.Message : e.ErrorMessage)
+                .FirstOrDefault(m => !string.IsNullOrWhiteSpace(m));
+
+            return first is null
+                ? "Request body is required."
+                : $"Invalid request body: {first}";
         }
 
         [HttpGet]

@@ -94,6 +94,18 @@ namespace FinCore.Controllers
             return this.ToActionResult(_commmon.NoContent());
         }
 
+        [HttpPatch("{cardId:int}/auto-conversion")]
+        public async Task<IActionResult> SetAutoConversion(
+            int cardId,
+            [FromBody] SetAutoConversionDto model,
+            CancellationToken ct = default
+            )
+        {
+            var result = await _cardService.SetAutoConversionAsync(cardId, GetUserId(), model, ct);
+
+            return this.ToActionResult(_commmon.Success(result));
+        }
+
         [HttpPatch("{cardId:int}/close")]
 
         public async Task<IActionResult> Close(int cardId,CancellationToken ct = default)

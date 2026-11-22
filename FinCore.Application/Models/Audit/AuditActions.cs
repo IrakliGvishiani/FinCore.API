@@ -20,6 +20,7 @@ namespace FinCore.Application.Models.Audit
         public const string AccountUnfrozen = "account.unfrozen";
         public const string CardPaymentCompleted = "card.payment_completed";
         public const string CardPaymentDeclined = "card.payment_declined";
+        public const string CardAutoConversionChanged = "card.auto_conversion_changed";
         public const string Deposit = "account.deposit";
         public const string TransferCompleted = "transfer.completed";
         public const string ConversionCompleted = "conversion.completed";

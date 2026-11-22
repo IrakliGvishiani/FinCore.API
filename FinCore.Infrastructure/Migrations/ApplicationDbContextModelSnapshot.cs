@@ -477,6 +477,15 @@ namespace FinCore.Infrastructure.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<decimal?>("ChargedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("ChargedCurrency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -489,24 +498,42 @@ namespace FinCore.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<decimal?>("ExchangeRate")
+                        .HasPrecision(18, 8)
+                        .HasColumnType("decimal(18,8)");
+
                     b.Property<string>("FailureReason")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
+
+                    b.Property<decimal?>("FeeAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("IdempotencyKey")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<decimal?>("LimitAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<string>("Merchant")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<DateTime?>("RateDate")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("Reference")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("SourceBankAccountId")
+                        .HasColumnType("int");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -520,6 +547,8 @@ namespace FinCore.Infrastructure.Migrations
 
                     b.HasIndex("Reference")
                         .IsUnique();
+
+                    b.HasIndex("SourceBankAccountId");
 
                     b.HasIndex("VirtualCardId", "CreatedAt");
 
@@ -666,6 +695,11 @@ namespace FinCore.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<bool>("AllowAutoConversion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
                     b.Property<int>("BankAccountId")
                         .HasColumnType("int");
 
@@ -688,10 +722,19 @@ namespace FinCore.Infrastructure.Migrations
                         .HasColumnType("nchar(4)")
                         .IsFixedLength();
 
+                    b.Property<DateTime?>("LastAuthorizedAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -927,6 +970,12 @@ namespace FinCore.Infrastructure.Migrations
 
             modelBuilder.Entity("FinCore.Domain.Entities.SimulatedPayment", b =>
                 {
+                    b.HasOne("FinCore.Domain.Entities.BankAccount", null)
+                        .WithMany()
+                        .HasForeignKey("SourceBankAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("FinCore.Domain.Entities.VirtualCard", null)
                         .WithMany()
                         .HasForeignKey("VirtualCardId")

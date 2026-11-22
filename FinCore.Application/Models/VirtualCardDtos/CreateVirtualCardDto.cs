@@ -10,5 +10,8 @@ namespace FinCore.Application.Models.VirtualCardDtos
         public string Name { get; set; } = null!;
         public decimal DailyLimit { get; set; }
         public decimal TransactionLimit { get; set; }
+
+        /// <summary>Optional, default false. See VirtualCard.AllowAutoConversion.</summary>
+        public bool AllowAutoConversion { get; set; }
     }
 }

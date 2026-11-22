@@ -1,6 +1,8 @@
 ﻿using FinCore.Application.Contracts.Persistence;
 using FinCore.Application.Contracts.Services;
 using FinCore.Application.Models.BankAccountDtos;
+using FinCore.Application.Models.ExchangeDtos;
+using Microsoft.Extensions.Options;
 using FinCore.Application.Models.VirtualCardDtos;
 using FinCore.Application.Services;
 using FinCore.Domain.Entities;
@@ -32,7 +34,8 @@ public class SimulatedPaymentServiceTests
             _ledgerAccounts.Object,
             _ledgerTransactions.Object,
             _unitOfWork.Object,
-            _audit.Object
+            _audit.Object,
+            new FxPricingService(new Mock<IExchangeRateProvider>(MockBehavior.Strict).Object, Options.Create(new ConversionOptions()))
         );
     }
 

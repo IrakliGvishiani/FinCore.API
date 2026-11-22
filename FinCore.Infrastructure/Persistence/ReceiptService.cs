@@ -19,19 +19,22 @@ namespace FinCore.Infrastructure.Persistence
         private readonly IRepositoryBase<VirtualCard> _cards;
         private readonly IRepositoryBase<CurrencyConversion> _conversions;
         private readonly IRepositoryBase<Transfer> _transfers;
+        private readonly IRepositoryBase<BankAccount> _accounts;
 
 
         public ReceiptService(
             IRepositoryBase<SimulatedPayment> repositoryBase,
             IRepositoryBase<VirtualCard> repositoryBase1,
             IRepositoryBase<CurrencyConversion> conversion,
-            IRepositoryBase<Transfer> repositoryBase2
+            IRepositoryBase<Transfer> repositoryBase2,
+            IRepositoryBase<BankAccount> accounts
             )
         {
             _payments = repositoryBase;
             _cards = repositoryBase1;
             _conversions = conversion;
             _transfers = repositoryBase2;
+            _accounts = accounts;
         }
 
         public async Task<byte[]> GeneratePaymentReceiptAsync(
@@ -51,6 +54,21 @@ namespace FinCore.Infrastructure.Persistence
                 tracking: false,
                 cancellationToken: ct
             ) ?? throw new NotFoundException("Payment not found.");
+
+            var sourceAccount = PaymentReceiptLines.ShowsConversion(payment)
+                ? await _accounts.GetAsync(
+                    x => x.Id == payment.SourceBankAccountId && x.UserId == userId,
+                    tracking: false,
+                    cancellationToken: ct)
+                : null;
+
+            return RenderPaymentReceipt(payment, card, sourceAccount);
+        }
+
+        /// <summary>Renders the payment receipt PDF from <see cref="PaymentReceiptLines"/>.</summary>
+        public static byte[] RenderPaymentReceipt(SimulatedPayment payment, VirtualCard card, BankAccount? sourceAccount)
+        {
+            var lines = PaymentReceiptLines.Build(payment, card, sourceAccount);
 
             return Document.Create(container =>
             {
@@ -102,36 +120,15 @@ namespace FinCore.Infrastructure.Persistence
                         column.Item()
                             .PaddingVertical(15)
                             .AlignCenter()
-                            .Text($"−{payment.Amount:N2} {payment.Currency}")
+                            .Text(PaymentReceiptLines.Headline(payment))
                             .FontSize(24)
                             .Bold();
 
                         column.Item().LineHorizontal(1)
                             .LineColor(Colors.Grey.Lighten2);
 
-                        AddDetail(column, "Reference", payment.Reference);
-                        AddDetail(column, "Merchant", payment.Merchant);
-                        AddDetail(column, "Card", $"•••• {card.Last4Digits}");
-                        AddDetail(column, "Currency", payment.Currency.ToString());
-                        AddDetail(
-                            column,
-                            "Date",
-                            payment.CreatedAt.ToString(
-                                "dd MMM yyyy, HH:mm:ss",
-                                CultureInfo.InvariantCulture) + " UTC");
-
-                        AddDetail(
-                            column,
-                            "Description",
-                            payment.Description ?? "N/A");
-
-                        if (payment.FailureReason is not null)
-                        {
-                            AddDetail(
-                                column,
-                                "Failure reason",
-                                payment.FailureReason.ToString()!);
-                        }
+                        foreach (var line in lines)
+                            AddDetail(column, line.Label, line.Value);
 
                         column.Item()
                             .PaddingTop(15)

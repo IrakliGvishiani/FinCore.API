@@ -43,7 +43,8 @@ namespace FinCore.Middleware
                 : ex.Message;
 
 
-            var response = new CommonResponse(ex.Message,null,false,statusCode);
+            // 500s never leak internal details; the real exception is logged above.
+            var response = new CommonResponse(message,null,false,statusCode);
 
             context.Response.ContentType = "application/json";
             context.Response.StatusCode = statusCode;

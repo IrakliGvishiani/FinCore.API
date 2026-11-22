@@ -23,13 +23,15 @@ namespace FinCore.Application.Services
         private readonly IUnitOfWork _unitOfWork;
         private readonly IRepositoryBase<SimulatedPayment> _payments;
         private readonly IMapper _mapper;
+        private readonly IAuditService _audit;
 
         public VirtualCardService(
             IRepositoryBase<VirtualCard> repositoryBase,
             IRepositoryBase<BankAccount> repositoryBase1,
             IUnitOfWork unitOfWork,
             IRepositoryBase<SimulatedPayment> payments,
-            IMapper mapper
+            IMapper mapper,
+            IAuditService audit
             )
         {
             _repo = repositoryBase;
@@ -37,6 +39,7 @@ namespace FinCore.Application.Services
             _unitOfWork = unitOfWork;
             _payments = payments;
             _mapper = mapper;
+            _audit = audit;
         }
 
 
@@ -68,7 +71,8 @@ namespace FinCore.Application.Services
                 last4,
                 model.DailyLimit,
                 model.TransactionLimit,
-                DateTime.UtcNow
+                DateTime.UtcNow,
+                model.AllowAutoConversion
                 );
 
             await _repo.AddAsync(card,ct);
@@ -82,8 +86,37 @@ namespace FinCore.Application.Services
                 ExpiryMonth = card.ExpiryMonth,
                 ExpiryYear = card.ExpiryYear,
                 DailyLimit = card.DailyLimit,
-                TransactionLimit = card.TransactionLimit
+                TransactionLimit = card.TransactionLimit,
+                AllowAutoConversion = card.AllowAutoConversion
             };
+        }
+
+        public async Task<VirtualCardDto> SetAutoConversionAsync(
+            int cardId, string userId, SetAutoConversionDto model, CancellationToken ct = default)
+        {
+            if (model?.Enabled is null)
+                throw new BadRequestException("'enabled' is required (true or false).");
+
+            var card = await _repo.GetAsync(
+                x => x.Id == cardId && x.UserId == userId,
+                cancellationToken: ct
+                ) ?? throw new NotFoundException("Virtual card not found");
+
+            var previous = card.AllowAutoConversion;
+            card.SetAutoConversion(model.Enabled.Value);   // DomainException (400) for a closed card
+
+            await _audit.RecordAsync(
+                userId,
+                AuditActions.CardAutoConversionChanged,
+                AuditEntities.VirtualCard,
+                card.Id.ToString(),
+                $"allowAutoConversion={card.AllowAutoConversion.ToString().ToLowerInvariant()}; " +
+                $"previous={previous.ToString().ToLowerInvariant()}",
+                ct);
+
+            await _unitOfWork.SaveChangesAsync(ct);
+
+            return MapToDto(card);
         }
 
         public async Task FreezeAsync(int cardId, string userId, CancellationToken cancellationToken = default)
@@ -184,6 +217,7 @@ namespace FinCore.Application.Services
                 Status = card.Status,
                 DailyLimit = card.DailyLimit,
                 TransactionLimit = card.TransactionLimit,
+                AllowAutoConversion = card.AllowAutoConversion,
                 CreatedAt = card.CreatedAt
             };
         }

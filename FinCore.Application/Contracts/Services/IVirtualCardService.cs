@@ -36,6 +36,13 @@ namespace FinCore.Application.Contracts.Services
         Task UnfreezeAsync(int cardId, string userId, CancellationToken cancellationToken = default);
         Task CloseAsync(int cardId, string userId, CancellationToken cancellationToken = default);
 
+        /// <summary>Turns automatic currency conversion on or off for a card (audited) and returns the updated card.</summary>
+        Task<VirtualCardDto> SetAutoConversionAsync(
+            int cardId,
+            string userId,
+            SetAutoConversionDto model,
+            CancellationToken ct = default);
+
 
     }
 }
