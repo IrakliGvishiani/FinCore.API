@@ -16,6 +16,7 @@ namespace FinCore.Application.Models.VirtualCardDtos
         public VirtualCardStatus Status { get; set; }
         public decimal DailyLimit { get; set; }
         public decimal TransactionLimit { get; set; }
+        public bool AllowAutoConversion { get; set; }
         public DateTime CreatedAt { get; set; }
     }
 }

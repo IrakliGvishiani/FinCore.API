@@ -13,5 +13,6 @@ namespace FinCore.Application.Models.VirtualCardDtos
         public int ExpiryYear { get; set; }
         public decimal DailyLimit { get; set; }
         public decimal TransactionLimit { get; set; }
+        public bool AllowAutoConversion { get; set; }
     }
 }

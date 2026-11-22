@@ -233,8 +233,7 @@ namespace FinCore.Application.Services
                     AuditActions.CardPaymentDeclined,
                     AuditEntities.VirtualCard,
                     card.Id.ToString(),
-                    $"amount={request.Amount} {currency}; " +
-                    $"merchant={payment.Merchant}; reason={declineReason}",
+                    AuditDetails(payment, source, mainAccount.Currency, declineReason),
                     ct
                     );
 
@@ -388,6 +387,26 @@ namespace FinCore.Application.Services
 
             // LimitAmount is set on every completed payment (backfilled = Amount for older rows).
             return todayPayments.Sum(x => x.LimitAmount ?? x.Amount);
+        }
+
+        /// <summary>
+        /// e.g. "merchantAmount=100.00 USD; charged=271.37 GEL; rate=0.37037037; fee=1.36 GEL; limitAmount=270.00 GEL;
+        /// sourceAccount=GE00...; merchant=Demo Shop; reason=" (n/a when declined before pricing). Invariant culture.
+        /// </summary>
+        internal static string AuditDetails(
+            SimulatedPayment payment, BankAccount source, CurrencyCode limitCurrency, PaymentDeclineReason? reason)
+        {
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            string Money(decimal? v, CurrencyCode c) => v is null ? "n/a" : $"{v.Value.ToString("0.00", inv)} {c}";
+
+            return
+                $"merchantAmount={Money(payment.Amount, payment.Currency)}; " +
+                $"charged={Money(payment.ChargedAmount, payment.ChargedCurrency)}; " +
+                $"rate={(payment.ExchangeRate is null ? "n/a" : payment.ExchangeRate.Value.ToString("0.########", inv))}; " +
+                $"fee={Money(payment.FeeAmount, payment.ChargedCurrency)}; " +
+                $"limitAmount={Money(payment.LimitAmount, limitCurrency)}; " +
+                $"sourceAccount={source.AccountNumber}; " +
+                $"merchant={payment.Merchant}; reason={reason}";
         }
 
         private static PaymentDto ToDto(SimulatedPayment payment, string last4Digits)
